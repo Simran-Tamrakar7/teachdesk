@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #e9eef3;
+  --bg-elevated: #f7f9fb;
+  --surface: #ffffff;
+  --ink: #1a2332;
+  --ink-muted: #5a6577;
+  --brand: #1f6f63;
+  --brand-deep: #145249;
+  --brand-soft: #d8ebe6;
+  --accent: #c47a1a;
+  --accent-soft: #f8ead3;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --line: #d5dde6;
+  --shadow: 0 10px 30px rgba(26, 35, 50, 0.06);
+  --radius: 14px;
+  --sidebar: #123a34;
+  --sidebar-ink: #e8f3f0;
+  --sidebar-muted: #9cbcb5;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-line: var(--line);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(31, 111, 99, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(196, 122, 26, 0.1), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.high-contrast {
+  --bg: #f0f0f0;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-muted: #222222;
+  --brand: #004d40;
+  --line: #000000;
+  --sidebar: #000000;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  padding: 0.55rem 0.95rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--brand-deep);
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--brand);
+  color: var(--brand-deep);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.btn-ghost:hover {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  color: var(--ink);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: 2px solid var(--brand-soft);
+  border-color: var(--brand);
+}
+
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
+.badge-warn {
+  background: var(--accent-soft);
+  color: #7a4a08;
+}
+
+.badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.page-enter {
+  animation: rise 0.35s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes softPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.loading-dot {
+  animation: softPulse 1.2s ease infinite;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c5d0da;
+  border-radius: 999px;
+}
