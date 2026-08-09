@@ -10,8 +10,16 @@ import {
   viewChapter,
 } from "@/lib/ai";
 import {
+  coverageSummary,
+  findManifestEntry,
+  listManifestGrades,
+  listManifestMediums,
+  listManifestSubjects,
+  CDC_MANIFEST_PORTAL,
+  type CdcMedium,
+} from "@/lib/cdc-manifest";
+import {
   findContentEntry,
-  hasVerifiedUnits,
   listContentGrades,
   listContentSubjects,
   listSourceIds,
@@ -157,7 +165,7 @@ export default function LibraryPage() {
   const [impSource, setImpSource] = useState<ContentSourceId>("cdc");
   const [impGrade, setImpGrade] = useState(8);
   const [impMedium, setImpMedium] = useState<ContentMedium>("en");
-  const [impSubject, setImpSubject] = useState("Science");
+  const [impSubject, setImpSubject] = useState("Science and Technology");
   const [impMsg, setImpMsg] = useState("");
 
   const [aiMode, setAiMode] = useState<"full" | "free">("full");
@@ -166,16 +174,37 @@ export default function LibraryPage() {
 
   const [reassignKey, setReassignKey] = useState("");
 
-  const impSubjects = useMemo(
-    () => listContentSubjects(impSource, impGrade, impMedium),
-    [impSource, impGrade, impMedium]
-  );
+  const impGrades = useMemo(() => {
+    const raw =
+      impSource === "cdc"
+        ? listManifestGrades()
+        : listContentGrades(impSource);
+    return raw.filter((g) => enabledGrades.length === 0 || enabledGrades.includes(String(g)));
+  }, [impSource, enabledGrades]);
+
+  const impSubjects = useMemo(() => {
+    if (impSource === "cdc") return listManifestSubjects(impGrade, impMedium as CdcMedium);
+    return listContentSubjects(impSource, impGrade, impMedium);
+  }, [impSource, impGrade, impMedium]);
+
+  const impMediums = useMemo(() => {
+    if (impSource === "cdc") return listManifestMediums(impGrade);
+    return ["en", "ne"] as ContentMedium[];
+  }, [impSource, impGrade]);
 
   useEffect(() => {
-    if (impSubjects.length && !impSubjects.includes(impSubject)) {
-      setImpSubject(impSubjects[0]);
-    }
+    if (impGrades.length && !impGrades.includes(impGrade)) setImpGrade(impGrades[0]);
+  }, [impGrades, impGrade]);
+
+  useEffect(() => {
+    if (impSubjects.length && !impSubjects.includes(impSubject)) setImpSubject(impSubjects[0]);
   }, [impSubjects, impSubject]);
+
+  useEffect(() => {
+    if (impMediums.length && !impMediums.includes(impMedium as CdcMedium)) {
+      setImpMedium(impMediums[0]);
+    }
+  }, [impMediums, impMedium]);
 
   const classChapters = useMemo(
     () =>
@@ -479,6 +508,11 @@ export default function LibraryPage() {
   }
 
   async function importContent() {
+    if (impSource === "cdc") {
+      await importFromCdcManifest();
+      return;
+    }
+
     const entry = findContentEntry(impSource, impGrade, impSubject, impMedium);
     if (!entry) {
       setImpMsg("No catalog entry for that selection. Try another combination or open the source site.");
@@ -487,91 +521,32 @@ export default function LibraryPage() {
     const targetClassId = ensureLibraryClass(String(impGrade), entry.subject);
     setBusy("import");
     setImpMsg("");
-    setProgress({ pct: 15, label: `Contacting ${SOURCE_META[impSource].name}…` });
+    setProgress({ pct: 20, label: `Opening ${SOURCE_META[impSource].name}…` });
 
-    let dataUrl: string | undefined;
-    let extracted = "";
-    let fetchError = "";
-
-    if (entry.pdfUrl) {
-      try {
-        const res = await fetch(`/api/cdc/fetch?url=${encodeURIComponent(entry.pdfUrl)}`);
-        const data = (await res.json()) as { ok?: boolean; dataUrl?: string; textHint?: string; error?: string };
-        if (res.ok && data.dataUrl) {
-          dataUrl = data.dataUrl;
-          extracted = data.textHint || "";
-        } else fetchError = data.error || `Could not download (${res.status}).`;
-      } catch (err) {
-        fetchError = err instanceof Error ? err.message : "Network error";
-      }
-    } else {
-      fetchError = "No direct file URL on file (links change by year) — creating catalog unit cards + source link.";
-    }
-
-    setProgress({ pct: 55, label: "Building chapter cards…" });
     const materialId = uid("m");
-    let chaptersOut: Chapter[] = [];
+    const chaptersOut: Chapter[] = (entry.unitTitles?.length
+      ? entry.unitTitles
+      : [`${entry.subject} — Class ${entry.grade}`]
+    ).map((title, i) => ({
+      id: uid("ch"),
+      subjectId: subjectIdFor(entry.subject),
+      classId: targetClassId,
+      materialId,
+      title,
+      unitNumber: i + 1,
+      lang: entry.medium === "ne" ? "ne" : "en",
+      summary: `${entry.badge} — open source link for full material.`,
+      keyTerms: [],
+      objectives: ["Open official / source material"],
+      discussionQuestions: [`What is the main idea of “${title}”?`],
+      body: `Unit ${i + 1}: ${title}\n\nSource: ${entry.sourcePageUrl}`,
+      wordCount: 30,
+      pageStart: i * 10 + 1,
+      pageEnd: (i + 1) * 10,
+      sourceBook: entry.title,
+    }));
 
-    if (extracted.trim().length > 80) {
-      chaptersOut = await runChapterSplit(
-        materialId,
-        targetClassId,
-        entry.title,
-        entry.title,
-        extracted,
-        entry.subject,
-        entry.medium === "ne" ? "ne" : "en"
-      );
-    } else if (entry.unitTitles?.length) {
-      chaptersOut = entry.unitTitles.map((title, i) => ({
-        id: uid("ch"),
-        subjectId: subjectIdFor(entry.subject),
-        classId: targetClassId,
-        materialId,
-        title,
-        unitNumber: i + 1,
-        lang: entry.medium === "ne" ? "ne" : "en",
-        summary: `${entry.badge} unit — ${title}. Open the source link for full material.`,
-        keyTerms: [],
-        objectives: ["Open official / source material", "Note key vocabulary"],
-        discussionQuestions: [`What is the main idea of “${title}”?`],
-        body: `Unit ${i + 1}: ${title}\n\nImported from ${entry.badge}. Source: ${entry.sourcePageUrl}`,
-        wordCount: 40,
-        pageStart: i * 20 + 1,
-        pageEnd: (i + 1) * 20,
-        sourceBook: entry.title,
-      }));
-      replaceChaptersForMaterial(materialId, chaptersOut);
-    } else {
-      // No verified chapter list — don't invent units; one card + link to official PDF/syllabus
-      chaptersOut = [
-        {
-          id: uid("ch"),
-          subjectId: subjectIdFor(entry.subject),
-          classId: targetClassId,
-          materialId,
-          title: `${entry.subject} — Class ${entry.grade} (outline pending)`,
-          unitNumber: 1,
-          lang: entry.medium === "ne" ? "ne" : "en",
-          summary:
-            "Subject listed under CDC structure. Chapter titles are not hardcoded — open the official source, or use Upload syllabus / paste a TOC to build unit cards accurately.",
-          keyTerms: [],
-          objectives: [
-            "Open the official CDC / source page",
-            "Upload syllabus or paste unit titles",
-            "Avoid teaching from guessed chapter lists",
-          ],
-          discussionQuestions: ["Which official units will you teach first?"],
-          body: `${entry.title}\n\n${entry.badge}\nSource: ${entry.sourcePageUrl}\n\nTeachDesk only auto-fills chapter cards when a verified unit list exists (currently: Class 8 Science EN). For other grades, import the subject shell here, then Upload syllabus or Extract from a textbook.`,
-          wordCount: 40,
-          pageStart: 1,
-          pageEnd: 2,
-          sourceBook: entry.title,
-        },
-      ];
-      replaceChaptersForMaterial(materialId, chaptersOut);
-    }
-
+    replaceChaptersForMaterial(materialId, chaptersOut);
     addMaterial({
       id: materialId,
       title: entry.title,
@@ -580,11 +555,8 @@ export default function LibraryPage() {
       subject: entry.subject,
       tags: [entry.source, entry.medium, `grade-${entry.grade}`],
       uploadedAt: new Date().toISOString(),
-      sizeLabel: dataUrl ? formatBytes(Math.round((dataUrl.length * 3) / 4)) : "Catalog import",
-      contentPreview: (extracted || entry.title).slice(0, 500),
-      extractedText: extracted || undefined,
-      dataUrl,
-      mime: entry.source === "dlc" ? "text/uri-list" : "application/pdf",
+      sizeLabel: "Catalog import",
+      contentPreview: entry.title,
       lang: entry.medium === "ne" ? "ne" : "en",
       sourceKind: entry.source,
       sourceLabel: entry.badge,
@@ -606,12 +578,178 @@ export default function LibraryPage() {
     setTimeout(() => setProgress(null), 600);
     setShowImport(false);
     setGroupKey(`${impGrade}::${entry.subject}`);
-    setAiNote(
-      fetchError
-        ? `Imported “${entry.title}” (${chaptersOut.length} units). Note: ${fetchError} Verify: ${entry.sourcePageUrl}`
-        : `Imported “${entry.title}” · ${chaptersOut.length} unit(s) · ${entry.badge}`
+    setAiNote(`Imported “${entry.title}” · ${chaptersOut.length} unit(s) · ${entry.badge}`);
+  }
+
+  async function importFromCdcManifest() {
+    const entry = findManifestEntry(impGrade, impSubject, impMedium as CdcMedium);
+    if (!entry) {
+      setImpMsg(
+        `Not in the verified CDC manifest. Available: ${coverageSummary()}. Or open ${CDC_MANIFEST_PORTAL}`
+      );
+      return;
+    }
+
+    // Same replace-or-cancel pattern as manual duplicate uploads
+    const existingSame = materials.find(
+      (m) =>
+        !m.deletedAt &&
+        m.sourceKind === "cdc" &&
+        (m.fileFingerprint === entry.id || m.title === entry.title)
     );
-    if (fetchError) setImpMsg(`${fetchError} — ${SOURCE_META[impSource].portal}`);
+    if (existingSame) {
+      if (
+        !confirm(
+          `“${entry.title}” is already in your library. Replace the existing Official — CDC entry?`
+        )
+      ) {
+        setImpMsg("Import cancelled — duplicate not added.");
+        return;
+      }
+      removeMaterial(existingSame.id);
+    }
+
+    setBusy("import");
+    setImpMsg("");
+    setProgress({ pct: 10, label: "Fetching official CDC PDF (server)…" });
+
+    try {
+      const res = await fetch("/api/library/import-cdc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grade: impGrade, subject: impSubject, medium: impMedium }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        reason?: string;
+        portal?: string;
+        sourceUrl?: string;
+        entry?: typeof entry;
+        bytes?: number;
+        dataUrl?: string;
+        extractedText?: string;
+        extractEngine?: string;
+        chaptersDetected?: boolean;
+        chapters?: Array<{
+          title: string;
+          unitNumber: number;
+          summary: string;
+          body?: string;
+          keyTerms: string[];
+          objectives: string[];
+          discussionQuestions: string[];
+          wordCount?: number;
+          pageStart?: number;
+          pageEnd?: number;
+          subjectId?: string;
+          lang?: ContentLang;
+        }>;
+        hint?: string;
+      };
+
+      if (!res.ok || !data.success) {
+        setBusy(null);
+        setProgress(null);
+        const reason = data.reason || `Import failed (${res.status}).`;
+        setImpMsg(reason);
+        setAiNote(
+          `${reason}${data.portal || data.sourceUrl ? ` Open: ${data.portal || data.sourceUrl}` : ""}`
+        );
+        return;
+      }
+
+      setProgress({ pct: 70, label: "Saving book + chapter cards…" });
+      const targetClassId = ensureLibraryClass(String(entry.grade), entry.subject);
+      const materialId = uid("m");
+      const chaptersOut: Chapter[] = (data.chapters || []).map((c) => ({
+        id: uid("ch"),
+        subjectId: c.subjectId || subjectIdFor(entry.subject),
+        classId: targetClassId,
+        materialId,
+        title: c.title,
+        unitNumber: c.unitNumber,
+        lang: c.lang || entry.medium,
+        summary: c.summary,
+        keyTerms: c.keyTerms || [],
+        objectives: c.objectives || [],
+        discussionQuestions: c.discussionQuestions || [],
+        body: c.body,
+        wordCount: c.wordCount,
+        pageStart: c.pageStart,
+        pageEnd: c.pageEnd,
+        sourceBook: entry.title,
+      }));
+
+      if (!chaptersOut.length) {
+        chaptersOut.push({
+          id: uid("ch"),
+          subjectId: subjectIdFor(entry.subject),
+          classId: targetClassId,
+          materialId,
+          title: entry.title,
+          unitNumber: 1,
+          lang: entry.medium,
+          summary: "PDF imported but no units detected — paste TOC or use Extract after editing text.",
+          keyTerms: [],
+          objectives: ["Paste unit headings", "Re-extract chapters"],
+          discussionQuestions: ["Which unit will you teach first?"],
+          body: data.extractedText?.slice(0, 4000) || entry.title,
+          wordCount: 20,
+          pageStart: 1,
+          pageEnd: 10,
+          sourceBook: entry.title,
+        });
+      }
+
+      addMaterial({
+        id: materialId,
+        title: entry.title,
+        type: "pdf",
+        classId: targetClassId,
+        subject: entry.subject,
+        tags: ["cdc", "official", entry.medium, `grade-${entry.grade}`],
+        uploadedAt: new Date().toISOString(),
+        sizeLabel: data.bytes ? formatBytes(data.bytes) : "CDC PDF",
+        contentPreview: (data.extractedText || entry.title).slice(0, 500),
+        extractedText: data.extractedText,
+        dataUrl: data.dataUrl,
+        mime: "application/pdf",
+        lang: entry.medium,
+        sourceKind: "cdc",
+        sourceLabel: "Official — CDC",
+        sourceUrl: entry.url,
+        official: true,
+        fileFingerprint: entry.id,
+        fileSizeBytes: data.bytes,
+        versions: [
+          {
+            id: uid("mv"),
+            version: 1,
+            uploadedAt: new Date().toISOString(),
+            note: `Official — CDC · verified ${entry.verifiedDate} · ${data.extractEngine || "server"}`,
+            fileName: `${entry.id}.pdf`,
+          },
+        ],
+      });
+      replaceChaptersForMaterial(materialId, chaptersOut);
+      if (chaptersOut[0]) setSelectedChapter(chaptersOut[0].id);
+      setGroupKey(`${entry.grade}::${entry.subject}`);
+      setShowImport(false);
+      setAiNote(
+        [
+          `Imported Official — CDC “${entry.title}” · ${chaptersOut.length} chapter card(s).`,
+          data.chaptersDetected === false || data.hint ? data.hint : null,
+          `Source: ${entry.url}`,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+    } catch (err) {
+      setImpMsg(err instanceof Error ? err.message : "Network error calling import API.");
+    } finally {
+      setBusy(null);
+      setTimeout(() => setProgress(null), 500);
+    }
   }
 
   async function generateWithAi(e: React.FormEvent) {
@@ -1405,9 +1543,10 @@ export default function LibraryPage() {
                 onChange={(e) => {
                   const s = e.target.value as ContentSourceId;
                   setImpSource(s);
-                  const g = listContentGrades(s)[0] ?? 8;
+                  const g = (s === "cdc" ? listManifestGrades() : listContentGrades(s))[0] ?? 8;
                   setImpGrade(g);
-                  const subs = listContentSubjects(s, g, impMedium);
+                  const subs =
+                    s === "cdc" ? listManifestSubjects(g, impMedium as CdcMedium) : listContentSubjects(s, g, impMedium);
                   if (subs[0]) setImpSubject(subs[0]);
                 }}
               >
@@ -1419,6 +1558,13 @@ export default function LibraryPage() {
               </select>
             </label>
             <p className="mt-2 text-xs text-ink-muted">{SOURCE_META[impSource].blurb}</p>
+            {impSource === "cdc" && (
+              <p className="mt-2 rounded-xl bg-brand-soft/50 px-3 py-2 text-xs text-ink-muted">
+                <strong>CDC import is available for:</strong> {coverageSummary()}. More being added to{" "}
+                <code className="rounded bg-bg-elevated px-1">data/cdc-manifest.json</code> after URL verification — we do
+                not scrape CDC live.
+              </p>
+            )}
             <label className="mt-3 block text-sm font-semibold">
               Grade
               <select
@@ -1427,13 +1573,14 @@ export default function LibraryPage() {
                 onChange={(e) => {
                   const g = Number(e.target.value);
                   setImpGrade(g);
-                  const subs = listContentSubjects(impSource, g, impMedium);
+                  const subs =
+                    impSource === "cdc"
+                      ? listManifestSubjects(g, impMedium as CdcMedium)
+                      : listContentSubjects(impSource, g, impMedium);
                   if (subs[0]) setImpSubject(subs[0]);
                 }}
               >
-                {listContentGrades(impSource)
-                  .filter((g) => enabledGrades.length === 0 || enabledGrades.includes(String(g)))
-                  .map((g) => (
+                {impGrades.map((g) => (
                   <option key={g} value={g}>
                     Class {g}
                   </option>
@@ -1448,12 +1595,18 @@ export default function LibraryPage() {
                 onChange={(e) => {
                   const m = e.target.value as ContentMedium;
                   setImpMedium(m);
-                  const subs = listContentSubjects(impSource, impGrade, m);
+                  const subs =
+                    impSource === "cdc"
+                      ? listManifestSubjects(impGrade, m as CdcMedium)
+                      : listContentSubjects(impSource, impGrade, m);
                   if (subs[0]) setImpSubject(subs[0]);
                 }}
               >
-                <option value="en">English</option>
-                <option value="ne">Nepali</option>
+                {(impSource === "cdc" ? impMediums : (["en", "ne"] as ContentMedium[])).map((m) => (
+                  <option key={m} value={m}>
+                    {m === "ne" ? "Nepali" : "English"}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="mt-3 block text-sm font-semibold">
@@ -1466,27 +1619,47 @@ export default function LibraryPage() {
                 ))}
               </select>
             </label>
-            {impSource === "cdc" && (
-              <p className="mt-2 rounded-xl bg-bg-elevated px-3 py-2 text-xs text-ink-muted">
-                Class {impGrade} subjects (CDC structure): {impSubjects.join(" · ") || "—"}.
-                {hasVerifiedUnits(impGrade, impSubject, impMedium)
-                  ? " Verified chapter units available for this pick — will create unit cards."
-                  : " No verified chapter list for this pick — imports a subject shell + CDC link; use Upload syllabus for accurate units."}
+            {!impSubjects.length && (
+              <p className="mt-2 text-sm text-danger">
+                No subjects in the manifest for this grade/medium. Pick another grade, or open{" "}
+                <a className="underline" href={CDC_MANIFEST_PORTAL} target="_blank" rel="noreferrer">
+                  moecdc.gov.np
+                </a>
+                .
               </p>
             )}
             <p className="mt-3 text-xs text-ink-muted">
-              Currently viewing <strong>{libraryLabel}</strong>. Import may open/create Class {impGrade} — {impSubject}. Portal:{" "}
-              <a className="text-brand underline" href={SOURCE_META[impSource].portal} target="_blank" rel="noreferrer">
-                {SOURCE_META[impSource].portal}
-              </a>
+              Currently viewing <strong>{libraryLabel}</strong>. Import may open/create Class {impGrade} — {impSubject}.{" "}
+              {impSource === "cdc" ? (
+                <>
+                  Portal:{" "}
+                  <a className="text-brand underline" href={CDC_MANIFEST_PORTAL} target="_blank" rel="noreferrer">
+                    {CDC_MANIFEST_PORTAL}
+                  </a>
+                </>
+              ) : (
+                <>
+                  Portal:{" "}
+                  <a className="text-brand underline" href={SOURCE_META[impSource].portal} target="_blank" rel="noreferrer">
+                    {SOURCE_META[impSource].portal}
+                  </a>
+                </>
+              )}
             </p>
-            {impMsg && <p className="mt-2 text-sm text-danger">{impMsg}</p>}
+            {impMsg && (
+              <p className="mt-2 text-sm text-danger">
+                {impMsg}{" "}
+                <a className="underline" href={CDC_MANIFEST_PORTAL} target="_blank" rel="noreferrer">
+                  Check CDC
+                </a>
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => setShowImport(false)}>
                 Cancel
               </button>
               <button className="btn btn-primary" disabled={!!busy || !impSubjects.length}>
-                {busy === "import" ? "Importing…" : "Import"}
+                {busy === "import" ? "Fetching & parsing PDF…" : "Import"}
               </button>
             </div>
           </form>

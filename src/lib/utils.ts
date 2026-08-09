@@ -73,27 +73,20 @@ export async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-/** Best-effort text pull from uploaded books (txt works; PDF may be sparse without a PDF engine). */
+import { extractTextbookTextFromBuffer } from "./pdf-text";
+
+/** Best-effort text pull from uploaded books (txt works; PDF uses shared binary peek on client). */
 export async function extractTextbookText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") || file.type.startsWith("text/")) {
     return (await file.text()).slice(0, 200_000);
   }
-  // Try decoding a slice — some PDFs include plain text streams
   try {
-    const buf = await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer();
-    const raw = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-    const cleaned = raw
-      .replace(/[^\x09\x0A\x0D\x20-\x7E\u0900-\u097F\u0980-\u09FF]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (cleaned.length > 400 && /chapter|अध्याय|unit|एकाइ/i.test(cleaned)) {
-      return cleaned.slice(0, 120_000);
-    }
+    const buf = new Uint8Array(await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer());
+    return extractTextbookTextFromBuffer(buf);
   } catch {
-    /* ignore */
+    return "";
   }
-  return "";
 }
 
 export function openDataUrl(dataUrl: string, fileName?: string) {

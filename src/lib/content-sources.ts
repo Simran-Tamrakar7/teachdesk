@@ -33,7 +33,8 @@ export const SOURCE_META: Record<
   cdc: {
     name: "Curriculum Development Centre (CDC)",
     portal: CDC_HOME,
-    blurb: "Official Nepal government textbooks, Grade 1–10, Nepali & English medium.",
+    blurb:
+      "Official CDC PDFs via verified manifest (not a live scrape). Only listed grade/subject/medium combos import; more added after URL checks.",
     badge: "Official — CDC",
   },
   cehrd: {

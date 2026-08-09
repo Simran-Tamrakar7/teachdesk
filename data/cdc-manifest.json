@@ -1,0 +1,116 @@
+{
+  "portal": "https://moecdc.gov.np/category/textbook/",
+  "notes": "Maintained static manifest of official CDC textbook PDFs. URLs live on giwmscdnone.gov.np (CDC CDN). Old moecdc.gov.np/storage/gallery/*.pdf IDs go stale — re-verify with HEAD before adding entries. Do not scrape CDC HTML at runtime.",
+  "entries": [
+    {
+      "id": "g1-english-en",
+      "grade": 1,
+      "subject": "English",
+      "medium": "en",
+      "title": "My English Class 1",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%AE%E0%A5%87%E0%A4%B0%E0%A5%8B%20%E0%A4%85%E0%A4%82%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A5%87%E0%A4%9C%E0%A5%80%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%A7_gvf7szb.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/150/my-english-class-1/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g1-nepali-ne",
+      "grade": 1,
+      "subject": "Nepali",
+      "medium": "ne",
+      "title": "मेरो नेपाली कक्षा १",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%AE%E0%A5%87%E0%A4%B0%E0%A5%8B%20%E0%A4%A8%E0%A5%87%E0%A4%AA%E0%A4%BE%E0%A4%B2%E0%A5%80%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%A7_yj4bcfx.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/151/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g1-mathematics-en",
+      "grade": 1,
+      "subject": "Mathematics",
+      "medium": "en",
+      "title": "My Mathematics Grade 1 (English)",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%AE%E0%A5%87%E0%A4%B0%E0%A5%8B%20%E0%A4%97%E0%A4%A3%E0%A4%BF%E0%A4%A4%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%A7%20(%E0%A4%85%E0%A4%82%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A5%87%E0%A4%9C%E0%A5%80%20%E0%A4%85%E0%A4%A8%E0%A5%81%E0%A4%B5%E0%A4%BE%E0%A4%A6)_cckfxvo.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/148/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g1-mathematics-ne",
+      "grade": 1,
+      "subject": "Mathematics",
+      "medium": "ne",
+      "title": "मेरो गणित कक्षा १",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%AE%E0%A5%87%E0%A4%B0%E0%A5%8B%20%E0%A4%97%E0%A4%A3%E0%A4%BF%E0%A4%A4%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%A7_2lqqbzc.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/149/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g8-science-en",
+      "grade": 8,
+      "subject": "Science and Technology",
+      "medium": "en",
+      "title": "Science and Technology Grade 8 (English) Part A",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%B5%E0%A4%BF%E0%A4%9C%E0%A5%8D%E0%A4%9E%E0%A4%BE%E0%A4%A8%20%E0%A4%A4%E0%A4%A5%E0%A4%BE%20%E0%A4%AA%E0%A5%8D%E0%A4%B0%E0%A4%B5%E0%A4%BF%E0%A4%A7%E0%A4%BF%20(%E0%A4%85%E0%A4%99%E0%A5%8D%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A5%87%E0%A4%9C%E0%A5%80%20%E0%A4%85%E0%A4%A8%E0%A5%81%E0%A4%B5%E0%A4%BE%E0%A4%A6)%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%AE%20(%E0%A4%95)_a3cai6y.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/71/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g8-english-en",
+      "grade": 8,
+      "subject": "English",
+      "medium": "en",
+      "title": "English Grade 8",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%85%E0%A4%99%E0%A5%8D%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A5%87%E0%A4%9C%E0%A5%80%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20-%20%E0%A5%AE_hxpk6jg.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/75/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g8-mathematics-en",
+      "grade": 8,
+      "subject": "Mathematics",
+      "medium": "en",
+      "title": "Mathematics Grade 8 (English)",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/%E0%A4%97%E0%A4%A3%E0%A4%BF%E0%A4%A4%20(%E0%A4%85%E0%A4%82%E0%A4%97%E0%A5%8D%E0%A4%B0%E0%A4%9C%E0%A5%80%20%E0%A4%85%E0%A4%A8%E0%A5%81%E0%A4%B5%E0%A4%BE%E0%A4%A6)%20%E0%A4%95%E0%A4%95%E0%A5%8D%E0%A4%B7%E0%A4%BE%20%E0%A5%AE_slnsxcm.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/73/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g9-english-en",
+      "grade": 9,
+      "subject": "English",
+      "medium": "en",
+      "title": "English Class 9",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/class%209%20English%20final_kfmalm2.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/64/english-class-9--2025-/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g9-mathematics-en",
+      "grade": 9,
+      "subject": "Mathematics",
+      "medium": "en",
+      "title": "Mathematics Grade 9 (English Translation) Part 1",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/Mathematics%20Grade%209%20(English%20Translation)%20Part%201_lnvm4wp.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/62/mathematics-class-9--translated-version-2022-/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g9-mathematics-ne",
+      "grade": 9,
+      "subject": "Mathematics",
+      "medium": "ne",
+      "title": "गणित कक्षा ९",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/Maths%20Grade%20-9%20(Nepali)_ssdrrmo.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/63/mathematics-class-9--2081-/",
+      "verifiedDate": "2026-08-09"
+    },
+    {
+      "id": "g9-nepali-ne",
+      "grade": 9,
+      "subject": "Nepali",
+      "medium": "ne",
+      "title": "नेपाली कक्षा ९",
+      "url": "https://giwmscdnone.gov.np/media/pdf_upload/6.Reduced-class%209%20Nepali_1tgrnzq.pdf",
+      "sourcePageUrl": "https://moecdc.gov.np/content/587/nepali-class-9--2082-/",
+      "verifiedDate": "2026-08-09"
+    }
+  ]
+}
