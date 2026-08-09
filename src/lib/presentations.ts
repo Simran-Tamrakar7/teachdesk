@@ -52,67 +52,147 @@ export const SLIDE_THEMES: Record<
   },
 };
 
-export function buildRichSlidesFromChapter(chapter: Chapter): PresentationSlide[] {
-  return [
+export type SlideDensity = "detailed" | "minimal";
+
+function shorten(text: string, max: number) {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1).trimEnd() + "…";
+}
+
+function bulletize(text: string, density: SlideDensity, maxItems: number) {
+  const parts = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const items = (parts.length ? parts : [text]).slice(0, maxItems);
+  return items.map((s) => (density === "minimal" ? shorten(s.replace(/\.$/, ""), 42) : shorten(s, 120)));
+}
+
+/** Build N slides from a chapter; density controls bullet length. */
+export function buildRichSlidesFromChapter(
+  chapter: Chapter,
+  opts?: { count?: number; density?: SlideDensity }
+): PresentationSlide[] {
+  const count = Math.min(15, Math.max(3, opts?.count ?? 6));
+  const density = opts?.density ?? "detailed";
+  const bodyBits = (chapter.body || chapter.summary || "")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 40);
+
+  const pool: Omit<PresentationSlide, "id">[] = [
     {
-      id: uid("s"),
       title: chapter.title,
-      bullets: chapter.objectives.slice(0, 4).length
-        ? chapter.objectives.slice(0, 4)
-        : ["Understand the big idea", "Use key vocabulary", "Apply in an example"],
+      bullets:
+        density === "minimal"
+          ? (chapter.objectives.slice(0, 3).length ? chapter.objectives.slice(0, 3).map((o) => shorten(o, 36)) : ["Big idea", "Key words", "Try it"])
+          : chapter.objectives.slice(0, 4).length
+            ? chapter.objectives.slice(0, 4)
+            : ["Understand the big idea", "Use key vocabulary", "Apply in an example"],
       notes: `Open with a hook. Objectives for ${chapter.title}.`,
       imageHint: "Cover diagram / chapter opener visual",
     },
     {
-      id: uid("s"),
-      title: "Key vocabulary",
-      bullets: chapter.keyTerms.slice(0, 6).map((t) => `${t} — student-friendly meaning`),
+      title: density === "minimal" ? "Words" : "Key vocabulary",
+      bullets: chapter.keyTerms.slice(0, density === "minimal" ? 4 : 6).map((t) =>
+        density === "minimal" ? t : `${t} — student-friendly meaning`
+      ),
       notes: "Use gesture + example for each term.",
       imageHint: "Word wall style icons",
     },
     {
-      id: uid("s"),
-      title: "Core explanation",
-      bullets: [
-        chapter.summary.slice(0, 140) + (chapter.summary.length > 140 ? "…" : ""),
-        `Focus pages: ${chapter.pageStart ?? "—"}–${chapter.pageEnd ?? "—"}`,
-        "Watch for a common misconception",
-      ],
+      title: density === "minimal" ? "Explain" : "Core explanation",
+      bullets: bulletize(
+        chapter.summary || `Focus pages ${chapter.pageStart ?? "—"}–${chapter.pageEnd ?? "—"}.`,
+        density,
+        density === "minimal" ? 3 : 4
+      ),
       notes: "Model one example think-aloud.",
       imageHint: "Process diagram placeholder",
     },
     {
-      id: uid("s"),
       title: "Discussion",
-      bullets: chapter.discussionQuestions.slice(0, 4).length
-        ? chapter.discussionQuestions.slice(0, 4)
-        : ["What surprised you?", "Where do we see this in life?"],
+      bullets: chapter.discussionQuestions.slice(0, density === "minimal" ? 3 : 4).length
+        ? chapter.discussionQuestions.slice(0, density === "minimal" ? 3 : 4).map((q) =>
+            density === "minimal" ? shorten(q, 40) : q
+          )
+        : density === "minimal"
+          ? ["Surprise?", "Real life?"]
+          : ["What surprised you?", "Where do we see this in life?"],
       notes: "Think-pair-share, 4 minutes.",
       imageHint: "Discussion prompt card",
     },
     {
-      id: uid("s"),
-      title: "Practice & check",
-      bullets: [
-        "Guided practice (pairs)",
-        "Independent check question",
-        "Exit ticket: one sentence summary",
-      ],
+      title: density === "minimal" ? "Practice" : "Practice & check",
+      bullets:
+        density === "minimal"
+          ? ["Pairs", "Solo check", "Exit ticket"]
+          : ["Guided practice (pairs)", "Independent check question", "Exit ticket: one sentence summary"],
       notes: chapter.pointers?.slice(0, 3).join(" · ") || "Circulate and spot misconceptions.",
       imageHint: "Worksheet / board task",
     },
     {
-      id: uid("s"),
-      title: "Wrap-up & homework",
-      bullets: [
-        "Recap 3 takeaways",
-        "Homework linked to objectives",
-        "Preview next lesson",
-      ],
+      title: density === "minimal" ? "Wrap" : "Wrap-up & homework",
+      bullets:
+        density === "minimal"
+          ? ["3 takeaways", "Homework", "Next lesson"]
+          : ["Recap 3 takeaways", "Homework linked to objectives", "Preview next lesson"],
       notes: "Collect exit tickets before dismissal.",
       imageHint: "Homework checklist",
     },
   ];
+
+  // Extra content slides from body paragraphs when asking for more slides
+  for (let i = 0; i < bodyBits.length && pool.length < 15; i++) {
+    pool.push({
+      title: density === "minimal" ? `Idea ${i + 1}` : `Deep dive ${i + 1}`,
+      bullets: bulletize(bodyBits[i], density, density === "minimal" ? 3 : 4),
+      notes: `Stay on this section ~3–4 minutes.`,
+      imageHint: `Illustration for: ${shorten(bodyBits[i], 48)}`,
+    });
+  }
+
+  while (pool.length < count) {
+    pool.push({
+      title: density === "minimal" ? `Check ${pool.length}` : `Check for understanding ${pool.length}`,
+      bullets:
+        density === "minimal"
+          ? ["Show me", "Explain to partner", "One question"]
+          : ["Cold-call a quick check", "Students explain to a partner", "Collect one lingering question"],
+      notes: "Keep pace brisk.",
+      imageHint: "Quick quiz visual",
+    });
+  }
+
+  return pool.slice(0, count).map((s) => ({ ...s, id: uid("s") }));
+}
+
+/** Demo AI image: SVG poster from prompt + theme (no external API). */
+export function generateSlideImageDataUrl(prompt: string, themeId: SlideThemeId): string {
+  const t = SLIDE_THEMES[themeId];
+  const lines = prompt.trim() || "Classroom visual";
+  const safe = lines
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .slice(0, 120);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${t.bg}"/>
+      <stop offset="100%" stop-color="${t.accent}"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#g)"/>
+  <circle cx="780" cy="120" r="90" fill="${t.accent}" opacity="0.35"/>
+  <circle cx="120" cy="420" r="140" fill="${t.fg}" opacity="0.08"/>
+  <text x="48" y="64" fill="${t.accent}" font-family="system-ui,sans-serif" font-size="22" font-weight="600">AI image</text>
+  <foreignObject x="48" y="200" width="864" height="200">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="color:${t.fg};font:600 36px/1.25 Georgia,serif;word-wrap:break-word">${safe}</div>
+  </foreignObject>
+</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 export function buildPresentationHtml(deck: Presentation): string {
@@ -132,7 +212,8 @@ button{background:transparent;border:1px solid var(--accent);color:var(--fg);bor
 const slides=${slidesJson};let i=0;const root=document.getElementById('root');const c=document.getElementById('c');
 function esc(t){return String(t).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function render(){root.innerHTML=slides.map((s,idx)=>'<section class="slide '+(idx===i?'active':'')+'"><h1>'+esc(s.title)+'</h1><ul>'+(s.bullets||[]).map(b=>'<li>'+esc(b)+'</li>').join('')+'</ul>'+(s.imageHint?'<div class="hint">[Image] '+esc(s.imageHint)+'</div>':'')+'</section>').join('');c.textContent=(i+1)+' / '+slides.length}
-document.getElementById('p').onclick=()=>{i=Math.max(0,i-1);render()};document.getElementById('n').onclick=()=>{i=Math.min(slides.length-1,i+1);render()};
-window.onkeydown=e=>{if(e.key==='ArrowRight'||e.key===' ') {e.preventDefault();i=Math.min(slides.length-1,i+1);render()} if(e.key==='ArrowLeft'){e.preventDefault();i=Math.max(0,i-1);render()}};render();
+function go(d){i=(i+d+slides.length)%slides.length;render()}
+document.getElementById('p').onclick=()=>go(-1);document.getElementById('n').onclick=()=>go(1);
+window.onkeydown=e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);if(e.key==='ArrowLeft')go(-1)};render();
 </script></body></html>`;
 }

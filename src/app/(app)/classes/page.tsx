@@ -19,6 +19,8 @@ function ClassPulseInner() {
   const attendance = useAppStore((s) => s.attendance);
   const grades = useAppStore((s) => s.grades);
   const assessments = useAppStore((s) => s.assessments);
+  const presentations = useAppStore((s) => s.presentations);
+  const chapters = useAppStore((s) => s.chapters);
   const threshold = useAppStore((s) => s.attendanceThreshold);
   const favorites = useAppStore((s) => s.favorites);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
@@ -54,6 +56,10 @@ function ClassPulseInner() {
       .filter((x): x is number => x != null);
     return forecastGrade(pcts)?.atRisk;
   });
+
+  const classDecks = presentations
+    .filter((p) => p.classId === classId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   const cls = allowed.find((c) => c.id === classId);
   const pinned = favorites.some((f) => f.kind === "class" && f.id === classId);
@@ -147,6 +153,39 @@ function ClassPulseInner() {
               </ul>
             </section>
           </div>
+
+          <section className="surface mt-4 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold">Presentations for this class</h3>
+              <Link className="btn btn-secondary text-sm" href={`/presentations?classId=${classId}&step=theme`}>
+                Open Presentation Maker
+              </Link>
+            </div>
+            <ul className="mt-3 space-y-2">
+              {classDecks.map((p) => {
+                const chTitle = chapters.find((c) => c.id === p.chapterId)?.title;
+                return (
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-sm">
+                    <div>
+                      <Link className="font-semibold hover:text-brand" href={`/presentations?classId=${classId}`}>
+                        {p.title}
+                      </Link>
+                      <div className="text-xs text-ink-muted">
+                        {chTitle ? `${chTitle} · ` : ""}
+                        {p.lessonDate ? `Lesson ${p.lessonDate}` : "No lesson date"}
+                      </div>
+                    </div>
+                    <Link className="btn btn-ghost text-xs" href="/presentations">
+                      Edit
+                    </Link>
+                  </li>
+                );
+              })}
+              {!classDecks.length && (
+                <li className="text-sm text-ink-muted">No decks tagged to this class yet — generate one from a chapter.</li>
+              )}
+            </ul>
+          </section>
         </>
       )}
     </div>

@@ -51,32 +51,8 @@ export default function LibraryPage() {
   const removeLibraryBookmark = useAppStore((s) => s.removeLibraryBookmark);
   const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
 
-  const activeClasses = useMemo(() => classes.filter((c) => !c.deletedAt), [classes]);
-
-  /** Class = grade + subject; section is subcategory */
-  const classGroups = useMemo(() => {
-    const map = new Map<string, { key: string; grade: string; subject: string; sections: typeof activeClasses }>();
-    for (const c of activeClasses) {
-      const key = `${c.grade}::${c.subject}`;
-      const cur = map.get(key) ?? { key, grade: c.grade, subject: c.subject, sections: [] as typeof activeClasses };
-      cur.sections.push(c);
-      map.set(key, cur);
-    }
-    return [...map.values()].sort((a, b) => Number(a.grade) - Number(b.grade) || a.subject.localeCompare(b.subject));
-  }, [activeClasses]);
-
-  const defaultGroup = classGroups.find((g) => g.grade === "8" && /science/i.test(g.subject)) ?? classGroups[0];
-  const [groupKey, setGroupKey] = useState(defaultGroup?.key ?? "");
-  const group = classGroups.find((g) => g.key === groupKey) ?? defaultGroup;
-  const [sectionFilter, setSectionFilter] = useState<string>("all"); // "all" | section letter
-  const sectionClasses = group?.sections ?? [];
-  const classId =
-    sectionFilter === "all"
-      ? sectionClasses[0]?.id ?? ""
-      : sectionClasses.find((c) => c.section === sectionFilter)?.id ?? sectionClasses[0]?.id ?? "";
-  const scopeClassIds =
-    sectionFilter === "all" ? sectionClasses.map((c) => c.id) : classId ? [classId] : [];
-
+  const [classId, setClassId] = useState(() => classes.find((c) => c.id === "c1")?.id ?? classes[0]?.id ?? "");
+  const [libTab, setLibTab] = useState<"content" | "bookmarks">("content");
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
   const [lang, setLang] = useState<ContentLang>("en");
   const [tagFilter, setTagFilter] = useState("");
@@ -92,31 +68,28 @@ export default function LibraryPage() {
   const [pasteText, setPasteText] = useState("");
   const [viewer, setViewer] = useState<Material | null>(null);
   const [editing, setEditing] = useState<Chapter | null>(null);
-  const [bmTitle, setBmTitle] = useState("");
+  const [bmLabel, setBmLabel] = useState("");
+  const [bmLink, setBmLink] = useState("");
   const [bmNote, setBmNote] = useState("");
+  const [editingBm, setEditingBm] = useState<string | null>(null);
 
   const classChapters = useMemo(
     () =>
       chapters
-        .filter((c) => scopeClassIds.includes(c.classId) && !c.deletedAt)
+        .filter((c) => c.classId === classId && !c.deletedAt)
         .sort((a, b) => a.unitNumber - b.unitNumber || a.title.localeCompare(b.title)),
-    [chapters, scopeClassIds]
+    [chapters, classId]
   );
 
   const filteredMaterials = materials.filter((m) => {
     if (m.deletedAt) return false;
-    if (!scopeClassIds.includes(m.classId)) return false;
+    if (m.classId !== classId) return false;
     if (selectedChapter && m.chapterId && m.chapterId !== selectedChapter) return false;
     if (tagFilter && !m.tags.some((t) => t.includes(tagFilter.toLowerCase()))) return false;
     return true;
   });
 
-  const scopeBookmarks = libraryBookmarks.filter(
-    (b) =>
-      b.grade === (group?.grade ?? "") &&
-      b.subject === (group?.subject ?? "") &&
-      (sectionFilter === "all" || !b.section || b.section === sectionFilter)
-  );
+  const classBookmarks = libraryBookmarks.filter((b) => b.classId === classId);
 
   const chapter = chapters.find((c) => c.id === selectedChapter && !c.deletedAt);
   const viewed = chapter ? viewChapter(chapter, lang) : null;
@@ -254,7 +227,7 @@ export default function LibraryPage() {
   }
 
   async function extractAllBooks() {
-    const books = materials.filter((m) => !m.deletedAt && scopeClassIds.includes(m.classId));
+    const books = materials.filter((m) => !m.deletedAt && m.classId === classId);
     if (!books.length) {
       setAiNote("No books in this class yet — upload a textbook first.");
       return;
@@ -270,7 +243,7 @@ export default function LibraryPage() {
       const text = m.extractedText || m.contentPreview || "";
       const fileName = m.versions.at(-1)?.fileName ?? m.title;
       const fromName = /science|technology|विज्ञान/i.test(`${m.title} ${fileName}`);
-      const subjectId = fromName || /science/i.test(group?.subject ?? "") ? "science" : "social";
+      const subjectId = fromName || /science/i.test(cls?.subject ?? "") ? "science" : "social";
       const detected = await splitTextbookIntoChapters(fileName, text, {
         classId: m.classId,
         subjectId,
@@ -291,25 +264,48 @@ export default function LibraryPage() {
       total += detected.length;
     }
     setProgress({ pct: 100, label: "Done" });
-    setAiNote(`Extracted ${total} unit card(s) across ${books.length} book(s) for Class ${group?.grade}.`);
+    setAiNote(`Extracted ${total} unit card(s) across ${books.length} book(s) for ${cls?.name ?? "this class"}.`);
     setBusy(null);
     setTimeout(() => setProgress(null), 700);
   }
 
   function saveBookmark(e: React.FormEvent) {
     e.preventDefault();
-    if (!group || !bmNote.trim()) return;
-    addLibraryBookmark({
-      grade: group.grade,
-      subject: group.subject,
-      section: sectionFilter === "all" ? undefined : sectionFilter,
-      title: bmTitle.trim() || (sectionFilter === "all" ? `Class ${group.grade} map` : `Section ${sectionFilter}`),
-      note: bmNote.trim(),
-    });
-    setBmTitle("");
+    if (!classId || !bmLabel.trim() || !bmLink.trim()) {
+      setAiNote("Bookmark needs a label and a link (chapter path or https://…).");
+      return;
+    }
+    if (editingBm) {
+      updateLibraryBookmark(editingBm, { label: bmLabel.trim(), link: bmLink.trim(), note: bmNote.trim() || undefined });
+      setEditingBm(null);
+      setAiNote("Bookmark updated.");
+    } else {
+      addLibraryBookmark({ classId, label: bmLabel.trim(), link: bmLink.trim(), note: bmNote.trim() || undefined });
+      setAiNote("Bookmark saved for this class.");
+    }
+    setBmLabel("");
+    setBmLink("");
     setBmNote("");
-    setAiNote("Bookmark saved — where this section’s books live.");
   }
+
+  function startEditBookmark(id: string) {
+    const b = libraryBookmarks.find((x) => x.id === id);
+    if (!b) return;
+    setEditingBm(id);
+    setBmLabel(b.label);
+    setBmLink(b.link);
+    setBmNote(b.note ?? "");
+    setLibTab("bookmarks");
+  }
+
+  function openBookmarkLink(link: string) {
+    if (link.startsWith("http://") || link.startsWith("https://")) {
+      window.open(link, "_blank", "noreferrer");
+      return;
+    }
+    window.location.href = link.startsWith("/") ? link : `/${link}`;
+  }
+
 
   async function runTranslate(to: ContentLang) {
     if (!chapter) return;
@@ -421,7 +417,7 @@ export default function LibraryPage() {
     <div>
       <PageHeader
         title="Content Library"
-        subtitle="Browse by Class → Section. Books first, then chapter cards. Bookmark where each section’s materials live."
+        subtitle="Class → books → chapters. Bookmarks: label + link + note for this class."
         actions={
           <>
             <div className="flex rounded-xl border border-line p-1">
@@ -442,52 +438,31 @@ export default function LibraryPage() {
         }
       />
 
-      <div className="mb-3">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">Class</div>
-        <div className="flex flex-wrap gap-2">
-          {classGroups.map((g) => (
-            <button
-              key={g.key}
-              type="button"
-              className={`btn ${group?.key === g.key ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => {
-                setGroupKey(g.key);
-                setSectionFilter("all");
-                setSelectedChapter(null);
-              }}
-            >
-              Class {g.grade} — {g.subject}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mb-4">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">Section (subcategory)</div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={`btn ${sectionFilter === "all" ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => {
-              setSectionFilter("all");
-              setSelectedChapter(null);
-            }}
-          >
-            All sections
-          </button>
-          {sectionClasses.map((c) => (
+      <div className="mb-3 flex flex-wrap gap-2">
+        {classes
+          .filter((c) => !c.deletedAt)
+          .map((c) => (
             <button
               key={c.id}
               type="button"
-              className={`btn ${sectionFilter === c.section ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${classId === c.id ? "btn-primary" : "btn-secondary"}`}
               onClick={() => {
-                setSectionFilter(c.section);
+                setClassId(c.id);
                 setSelectedChapter(null);
               }}
             >
-              Section {c.section}
+              {c.name}
             </button>
           ))}
-        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button type="button" className={`btn ${libTab === "content" ? "btn-primary" : "btn-secondary"}`} onClick={() => setLibTab("content")}>
+          Books & chapters
+        </button>
+        <button type="button" className={`btn ${libTab === "bookmarks" ? "btn-primary" : "btn-secondary"}`} onClick={() => setLibTab("bookmarks")}>
+          <Bookmark size={16} /> Bookmarks
+        </button>
       </div>
 
       {progress && (
@@ -510,32 +485,24 @@ export default function LibraryPage() {
           type="button"
           className="btn btn-secondary"
           onClick={() => {
-            const label =
-              sectionFilter === "all"
-                ? `Class ${group?.grade} — ${group?.subject}`
-                : `Class ${group?.grade}${sectionFilter} — ${group?.subject}`;
-            if (!confirm(`Clear library for ${label}?`)) return;
-            for (const id of scopeClassIds) clearClassLibrary(id);
+            if (!confirm(`Clear library for ${cls?.name ?? "this class"}?`)) return;
+            clearClassLibrary(classId);
             setSelectedChapter(null);
-            setAiNote(`Cleared library for ${label}.`);
+            setAiNote(`Cleared library for ${cls?.name ?? "this class"}.`);
           }}
         >
-          <Eraser size={16} /> Clear this view
+          <Eraser size={16} /> Clear class library
         </button>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <section className="space-y-3">
-          <div className="mb-1 text-sm font-semibold">
-            Books · Class {group?.grade}
-            {sectionFilter !== "all" ? ` · Sec ${sectionFilter}` : " · all sections"}
-          </div>
+        <section className={`space-y-3 ${libTab === "bookmarks" ? "hidden xl:block" : ""}`}>
+          <div className="mb-1 text-sm font-semibold">Books · {cls?.name ?? "Class"}</div>
           <input className="input mb-2 max-w-xs" placeholder="Filter by tag…" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} />
           {filteredMaterials.length === 0 ? (
             <div className="surface p-6 text-sm text-ink-muted">No books here yet. Upload a textbook for this class.</div>
           ) : (
             filteredMaterials.map((m) => {
-              const sec = classes.find((c) => c.id === m.classId)?.section;
               return (
                 <article key={m.id} className="surface mb-3 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -544,7 +511,7 @@ export default function LibraryPage() {
                         <FileText size={16} className="text-brand" />
                         <h3 className="font-semibold">{m.title}</h3>
                         <span className="badge uppercase">{m.type}</span>
-                        {sec && <span className="badge">Sec {sec}</span>}
+                        
                       </div>
                       <p className="mt-1 text-sm text-ink-muted">
                         {m.sizeLabel} · {formatDate(m.uploadedAt)}
@@ -599,7 +566,6 @@ export default function LibraryPage() {
               const pages =
                 ch.pageStart && ch.pageEnd ? `pp. ${ch.pageStart}–${ch.pageEnd}` : "Pages —";
               const selected = selectedChapter === ch.id;
-              const sec = classes.find((c) => c.id === ch.classId)?.section;
               return (
                 <article
                   key={ch.id}
@@ -613,7 +579,7 @@ export default function LibraryPage() {
                       </h3>
                       <p className="mt-1 text-xs text-ink-muted">
                         {pages} · {words} words · {ch.sourceBook || "Library book"}
-                        {sec ? ` · Sec ${sec}` : ""}
+                        
                       </p>
                       <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{v.summary}</p>
                     </div>
@@ -662,59 +628,56 @@ export default function LibraryPage() {
         </section>
 
         <aside className="space-y-4">
-          <div className="surface h-fit p-4">
+          <div className={`surface h-fit p-4 ${libTab !== "bookmarks" ? "hidden xl:block" : ""}`}>
             <h3 className="flex items-center gap-2 font-display text-xl">
-              <Bookmark size={18} /> Section bookmarks
+              <Bookmark size={18} /> Bookmarks
             </h3>
             <p className="mt-1 text-xs text-ink-muted">
-              Write where each section&apos;s books live — shelf, cupboard, Drive folder, etc.
+              Label + link for this class — chapter path (e.g. /library/chapters/…) or any https URL.
             </p>
             <form className="mt-3 space-y-2" onSubmit={saveBookmark}>
-              <input
-                className="input"
-                placeholder="Label (e.g. Science PDFs)"
-                value={bmTitle}
-                onChange={(e) => setBmTitle(e.target.value)}
-              />
-              <textarea
-                className="textarea min-h-20"
-                placeholder={`e.g. Class ${group?.grade} Section ${sectionFilter === "all" ? "A" : sectionFilter} books — left cupboard, 2nd shelf`}
-                value={bmNote}
-                onChange={(e) => setBmNote(e.target.value)}
-                required
-              />
-              <button type="submit" className="btn btn-primary w-full">
-                Save bookmark
-              </button>
-            </form>
-            <ul className="mt-4 space-y-2">
-              {scopeBookmarks.map((b) => (
-                <li key={b.id} className="rounded-xl border border-line bg-bg-elevated p-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold">
-                        {b.title}
-                        {b.section ? ` · Sec ${b.section}` : " · whole class"}
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap text-ink-muted">{b.note}</p>
-                    </div>
-                    <button type="button" className="btn btn-ghost text-danger" onClick={() => removeLibraryBookmark(b.id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+              <input className="input" placeholder="Label (e.g. Left off at Ch 5)" value={bmLabel} onChange={(e) => setBmLabel(e.target.value)} required />
+              <input className="input" placeholder="Link (/library/chapters/id or https://…)" value={bmLink} onChange={(e) => setBmLink(e.target.value)} required />
+              <textarea className="textarea min-h-16" placeholder="Optional note" value={bmNote} onChange={(e) => setBmNote(e.target.value)} />
+              <div className="flex gap-2">
+                <button type="submit" className="btn btn-primary flex-1">
+                  {editingBm ? "Update bookmark" : "Save bookmark"}
+                </button>
+                {editingBm && (
                   <button
                     type="button"
-                    className="mt-2 text-xs text-brand"
+                    className="btn btn-secondary"
                     onClick={() => {
-                      const next = prompt("Edit note", b.note);
-                      if (next != null) updateLibraryBookmark(b.id, { note: next });
+                      setEditingBm(null);
+                      setBmLabel("");
+                      setBmLink("");
+                      setBmNote("");
                     }}
                   >
-                    Edit note
+                    Cancel
                   </button>
+                )}
+              </div>
+            </form>
+            <ul className="mt-4 space-y-2">
+              {classBookmarks.map((b) => (
+                <li key={b.id} className="rounded-xl border border-line bg-bg-elevated p-3 text-sm">
+                  <button type="button" className="text-left font-semibold text-brand hover:underline" onClick={() => openBookmarkLink(b.link)}>
+                    {b.label}
+                  </button>
+                  {b.note && <p className="mt-1 whitespace-pre-wrap text-ink-muted">{b.note}</p>}
+                  <p className="mt-1 truncate text-xs text-ink-muted">{b.link}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" className="btn btn-ghost text-xs" onClick={() => startEditBookmark(b.id)}>
+                      <Pencil size={12} /> Edit
+                    </button>
+                    <button type="button" className="btn btn-ghost text-xs text-danger" onClick={() => removeLibraryBookmark(b.id)}>
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
                 </li>
               ))}
-              {!scopeBookmarks.length && <li className="text-sm text-ink-muted">No bookmarks for this class yet.</li>}
+              {!classBookmarks.length && <li className="text-sm text-ink-muted">No bookmarks for this class yet.</li>}
             </ul>
           </div>
 
@@ -763,8 +726,7 @@ export default function LibraryPage() {
           <form className="surface max-h-[90vh] w-full max-w-lg overflow-y-auto p-5" onSubmit={handleUpload}>
             <h3 className="font-display text-2xl">Upload textbook</h3>
             <p className="mt-1 text-sm text-ink-muted">
-              Uploads go into Class {group?.grade}
-              {sectionFilter !== "all" ? ` Section ${sectionFilter}` : ` (Section ${sectionClasses[0]?.section ?? "A"} by default)`} — {group?.subject}.
+              Uploads go into {cls?.name ?? "the selected class"}. Paste TOC text if the PDF has no extractable text.
             </p>
             <label className="mt-4 flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg-elevated px-4 py-6 text-center hover:border-brand">
               <Upload className="text-brand" />

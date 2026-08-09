@@ -1232,6 +1232,9 @@ export const useAppStore = create<AppState>()(
           users,
           classes: Array.isArray(p.classes) && p.classes.length ? p.classes : current.classes,
           chapters: Array.isArray(p.chapters) && p.chapters.length ? p.chapters : current.chapters,
+          libraryBookmarks: Array.isArray(p.libraryBookmarks)
+            ? p.libraryBookmarks.filter((b: { classId?: string; label?: string; link?: string }) => b?.classId && b?.label && b?.link)
+            : current.libraryBookmarks,
         };
       },
       onRehydrateStorage: () => (state) => {

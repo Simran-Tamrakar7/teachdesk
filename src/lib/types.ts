@@ -288,6 +288,8 @@ export type Presentation = {
   title: string;
   chapterId?: string;
   classId?: string;
+  /** Optional lesson / exam date tag (YYYY-MM-DD) */
+  lessonDate?: string;
   theme: SlideThemeId;
   slides: PresentationSlide[];
   updatedAt: string;
@@ -334,14 +336,13 @@ export type FavoriteItem = {
   href: string;
 };
 
-/** Free-text map of where a class/section’s books live (shelf, folder, drive link, etc.) */
+/** Class-scoped bookmark: label + link + optional note */
 export type LibraryBookmark = {
   id: string;
-  grade: string;
-  subject: string;
-  section?: string;
-  title: string;
-  note: string;
+  classId: string;
+  label: string;
+  link: string;
+  note?: string;
   createdAt: string;
 };
 
