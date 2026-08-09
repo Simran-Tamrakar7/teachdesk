@@ -32,6 +32,7 @@ import type {
   Chapter,
   ChatMessage,
   FavoriteItem,
+  LibraryBookmark,
   GradeEntry,
   Holiday,
   LessonPlan,
@@ -135,6 +136,7 @@ const initialData = {
   aiLog: [] as AiLogEntry[],
   recentItems: [] as RecentItem[],
   favorites: [] as FavoriteItem[],
+  libraryBookmarks: [] as LibraryBookmark[],
   templates: DEFAULT_TEMPLATES,
   lastLoginAt: undefined as string | undefined,
   previousLoginAt: undefined as string | undefined,
@@ -207,6 +209,7 @@ type AppState = {
   breakReminders: boolean;
   recentItems: RecentItem[];
   favorites: FavoriteItem[];
+  libraryBookmarks: LibraryBookmark[];
   templates: SavedTemplate[];
   lastLoginAt?: string;
   previousLoginAt?: string;
@@ -314,6 +317,9 @@ type AppState = {
   setBreakReminders: (v: boolean) => void;
   pushRecent: (item: Omit<RecentItem, "at">) => void;
   toggleFavorite: (item: FavoriteItem) => void;
+  addLibraryBookmark: (b: Omit<LibraryBookmark, "id" | "createdAt">) => void;
+  updateLibraryBookmark: (id: string, patch: Partial<LibraryBookmark>) => void;
+  removeLibraryBookmark: (id: string) => void;
   dismissMissedAttendance: (dateKey: string) => void;
   addTemplate: (t: Omit<SavedTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
@@ -983,6 +989,16 @@ export const useAppStore = create<AppState>()(
               : [item, ...get().favorites].slice(0, 20),
           });
         },
+        addLibraryBookmark: (b) =>
+          set({
+            libraryBookmarks: [{ ...b, id: uid("lb"), createdAt: nowIso() }, ...get().libraryBookmarks],
+          }),
+        updateLibraryBookmark: (id, patch) =>
+          set({
+            libraryBookmarks: get().libraryBookmarks.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+          }),
+        removeLibraryBookmark: (id) =>
+          set({ libraryBookmarks: get().libraryBookmarks.filter((x) => x.id !== id) }),
         dismissMissedAttendance: (dateKey) => set({ missedAttendanceDismissedFor: dateKey }),
         addTemplate: (t) => set({ templates: [{ ...t, id: uid("tpl") }, ...get().templates] }),
         removeTemplate: (id) => set({ templates: get().templates.filter((t) => t.id !== id) }),
@@ -1189,6 +1205,7 @@ export const useAppStore = create<AppState>()(
         breakReminders: s.breakReminders,
         recentItems: s.recentItems,
         favorites: s.favorites,
+        libraryBookmarks: s.libraryBookmarks,
         templates: s.templates,
         lastLoginAt: s.lastLoginAt,
         previousLoginAt: s.previousLoginAt,

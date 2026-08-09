@@ -334,6 +334,17 @@ export type FavoriteItem = {
   href: string;
 };
 
+/** Free-text map of where a class/section’s books live (shelf, folder, drive link, etc.) */
+export type LibraryBookmark = {
+  id: string;
+  grade: string;
+  subject: string;
+  section?: string;
+  title: string;
+  note: string;
+  createdAt: string;
+};
+
 export type SavedTemplate = {
   id: string;
   kind: "lesson" | "comment" | "worksheet";
