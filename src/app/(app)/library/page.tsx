@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai";
 import {
   findContentEntry,
+  hasVerifiedUnits,
   listContentGrades,
   listContentSubjects,
   listSourceIds,
@@ -51,7 +52,7 @@ import {
   Wand2,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function Badge({ label, tone }: { label: string; tone: string }) {
   const cls =
@@ -153,6 +154,12 @@ export default function LibraryPage() {
     () => listContentSubjects(impSource, impGrade, impMedium),
     [impSource, impGrade, impMedium]
   );
+
+  useEffect(() => {
+    if (impSubjects.length && !impSubjects.includes(impSubject)) {
+      setImpSubject(impSubjects[0]);
+    }
+  }, [impSubjects, impSubject]);
 
   const classChapters = useMemo(
     () =>
@@ -520,23 +527,29 @@ export default function LibraryPage() {
       }));
       replaceChaptersForMaterial(materialId, chaptersOut);
     } else {
+      // No verified chapter list — don't invent units; one card + link to official PDF/syllabus
       chaptersOut = [
         {
           id: uid("ch"),
-          subjectId: "general",
+          subjectId: subjectIdFor(entry.subject),
           classId: targetClassId,
           materialId,
-          title: entry.title,
+          title: `${entry.subject} — Class ${entry.grade} (outline pending)`,
           unitNumber: 1,
           lang: entry.medium === "ne" ? "ne" : "en",
-          summary: `${entry.badge} listing imported. Open the source page to verify.`,
+          summary:
+            "Subject listed under CDC structure. Chapter titles are not hardcoded — open the official source, or use Upload syllabus / paste a TOC to build unit cards accurately.",
           keyTerms: [],
-          objectives: ["Open source material"],
-          discussionQuestions: ["Which units will you teach first?"],
-          body: `${entry.title}\n\nSource: ${entry.sourcePageUrl}`,
-          wordCount: 20,
+          objectives: [
+            "Open the official CDC / source page",
+            "Upload syllabus or paste unit titles",
+            "Avoid teaching from guessed chapter lists",
+          ],
+          discussionQuestions: ["Which official units will you teach first?"],
+          body: `${entry.title}\n\n${entry.badge}\nSource: ${entry.sourcePageUrl}\n\nTeachDesk only auto-fills chapter cards when a verified unit list exists (currently: Class 8 Science EN). For other grades, import the subject shell here, then Upload syllabus or Extract from a textbook.`,
+          wordCount: 40,
           pageStart: 1,
-          pageEnd: 10,
+          pageEnd: 2,
           sourceBook: entry.title,
         },
       ];
@@ -1435,6 +1448,14 @@ export default function LibraryPage() {
                 ))}
               </select>
             </label>
+            {impSource === "cdc" && (
+              <p className="mt-2 rounded-xl bg-bg-elevated px-3 py-2 text-xs text-ink-muted">
+                Class {impGrade} subjects (CDC structure): {impSubjects.join(" · ") || "—"}.
+                {hasVerifiedUnits(impGrade, impSubject, impMedium)
+                  ? " Verified chapter units available for this pick — will create unit cards."
+                  : " No verified chapter list for this pick — imports a subject shell + CDC link; use Upload syllabus for accurate units."}
+              </p>
+            )}
             <p className="mt-3 text-xs text-ink-muted">
               Currently viewing <strong>{libraryLabel}</strong>. Import may open/create Class {impGrade} — {impSubject}. Portal:{" "}
               <a className="text-brand underline" href={SOURCE_META[impSource].portal} target="_blank" rel="noreferrer">

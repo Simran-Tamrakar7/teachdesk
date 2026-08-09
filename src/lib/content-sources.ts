@@ -80,120 +80,158 @@ function e(
   };
 }
 
-/** Representative on-demand entries — expand as URLs are verified. */
-export const CONTENT_CATALOG: ContentCatalogEntry[] = [
-  // CDC
-  e("cdc", 1, "Nepali", "ne", "मेरो नेपाली कक्षा १"),
-  e("cdc", 1, "English", "en", "My English Grade 1"),
-  e("cdc", 1, "Mathematics", "en", "My Mathematics Grade 1"),
-  e("cdc", 2, "English", "en", "My English Grade 2", {
-    sourcePageUrl: "http://lib.moecdc.gov.np/catalog/opac_css/index.php?id=12030&lvl=notice_display",
-  }),
-  e("cdc", 3, "Science", "en", "Science Grade 3"),
-  e("cdc", 4, "Social Studies", "en", "Social Studies Grade 4"),
-  e("cdc", 5, "Mathematics", "en", "Mathematics Grade 5"),
-  e("cdc", 6, "Nepali", "ne", "मेरो नेपाली कक्षा ६", {
-    sourcePageUrl: "https://lib.moecdc.gov.np/elibrary/?r=3886",
-  }),
-  e("cdc", 6, "English", "en", "My English Grade 6"),
-  e("cdc", 6, "Mathematics", "en", "My Mathematics Grade 6"),
-  e("cdc", 6, "Mathematics", "ne", "मेरो गणित कक्षा ६"),
-  e("cdc", 6, "Science", "en", "Science and Technology Grade 6"),
-  e("cdc", 6, "Science", "ne", "विज्ञान तथा प्रविधि कक्षा ६"),
-  e("cdc", 6, "Social Studies", "en", "Social Studies Grade 6"),
-  e("cdc", 6, "Social Studies", "ne", "सामाजिक अध्ययन कक्षा ६"),
-  e("cdc", 7, "Nepali", "ne", "नेपाली कक्षा ७"),
-  e("cdc", 7, "English", "en", "English Grade 7"),
-  e("cdc", 7, "Mathematics", "en", "Mathematics Grade 7"),
-  e("cdc", 7, "Science", "en", "Science and Technology Grade 7"),
-  e("cdc", 7, "Social Studies", "en", "Social Studies Grade 7"),
-  e("cdc", 8, "Nepali", "ne", "नेपाली कक्षा ८"),
-  e("cdc", 8, "English", "en", "English Grade 8"),
-  e("cdc", 8, "Mathematics", "en", "Mathematics Grade 8"),
-  e("cdc", 8, "Science", "en", "Science and Technology Grade 8 (Part I)", {
-    unitTitles: [
-      "Scientific Learning",
-      "Information and Communication Technology",
-      "Living Beings and Their Structure",
-      "Biodiversity and Environment",
-      "Life Process",
-      "Force and Motion",
-      "Energy in Daily Life",
-      "Electricity and Magnetism",
-      "Matter",
-      "Materials Used in Daily Life",
-      "The Earth and Universe",
-    ],
-  }),
-  e("cdc", 8, "Science", "ne", "विज्ञान तथा प्रविधि कक्षा ८"),
-  e("cdc", 8, "Social Studies", "en", "Social Studies Grade 8"),
-  e("cdc", 8, "Health", "en", "Health, Physical and Creative Arts Grade 8"),
-  e("cdc", 9, "Nepali", "ne", "नेपाली कक्षा ९"),
-  e("cdc", 9, "English", "en", "English Grade 9"),
-  e("cdc", 9, "Mathematics", "en", "Mathematics Grade 9"),
-  e("cdc", 9, "Science", "en", "Science and Technology Grade 9"),
-  e("cdc", 9, "Social Studies", "en", "Social Studies Grade 9"),
-  e("cdc", 9, "Computer Science", "en", "Computer Science Grade 9 (Optional)"),
-  e("cdc", 9, "Accountancy", "en", "Accountancy Grade 9 (Optional)"),
-  e("cdc", 10, "Nepali", "ne", "नेपाली कक्षा १०"),
-  e("cdc", 10, "English", "en", "English Grade 10"),
-  e("cdc", 10, "Mathematics", "en", "Mathematics Grade 10"),
-  e("cdc", 10, "Science", "en", "Science and Technology Grade 10"),
-  e("cdc", 10, "Social Studies", "en", "Social Studies Grade 10"),
-  e("cdc", 10, "Optional Math", "en", "Elective Mathematics Grade 10", {
-    sourcePageUrl: "https://moecdc.gov.np/content/656/elective-mathematics-class-10--corrected-copy-/",
-  }),
-  e("cdc", 10, "Economics", "en", "Economics Grade 10 (Optional)"),
-  e("cdc", 10, "History", "en", "History Grade 10 (Optional)"),
+/**
+ * Confirmed CDC subject structure by grade band (not chapter-by-chapter syllabi).
+ * Chapter lists stay on-demand from moecdc.gov.np — we only hardcode units when verified.
+ */
+export const CDC_SUBJECTS_BY_GRADE: Record<number, string[]> = {
+  1: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science (Serofero)",
+    "Health & Physical Education",
+    "Social Studies",
+    "Creative Arts",
+  ],
+  2: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science (Serofero)",
+    "Health & Physical Education",
+    "Social Studies",
+    "Creative Arts",
+  ],
+  3: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science (Serofero)",
+    "Health & Physical Education",
+    "Social Studies",
+    "Creative Arts",
+  ],
+  4: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  5: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  6: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  7: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  8: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  9: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science",
+    "Social Studies",
+    "Computer Science",
+    "Accountancy",
+    "Economics",
+    "Optional Math",
+  ],
+  10: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science",
+    "Social Studies",
+    "Computer Science",
+    "Accountancy",
+    "Economics",
+    "Optional Math",
+    "History",
+  ],
+};
 
-  // CEHRD / Sikai Chautari — portal links + unit seeds
-  e("cehrd", 6, "Science", "en", "Sikai Chautari — Class 6 Science", {
-    unitTitles: ["Living things", "Matter around us", "Force and energy", "Earth and space"],
-  }),
-  e("cehrd", 7, "Science", "en", "Sikai Chautari — Class 7 Science", {
-    unitTitles: ["Life processes", "Materials", "Motion and force", "Environment"],
-  }),
-  e("cehrd", 8, "Science", "en", "Sikai Chautari — Class 8 Science", {
-    unitTitles: ["Scientific learning", "Living beings", "Force and motion", "Matter", "Earth"],
-  }),
-  e("cehrd", 8, "Mathematics", "en", "Sikai Chautari — Class 8 Mathematics"),
+/** Verified unit titles only — Grade 8 Science Part I TOC (textbook). Do not invent other grades. */
+export const VERIFIED_CDC_UNITS: Record<string, string[]> = {
+  "8|Science|en": [
+    "Scientific Learning",
+    "Information and Communication Technology",
+    "Living Beings and Their Structure",
+    "Biodiversity and Environment",
+    "Life Process",
+    "Force and Motion",
+    "Energy in Daily Life",
+    "Electricity and Magnetism",
+    "Matter",
+    "Materials Used in Daily Life",
+    "The Earth and Universe",
+  ],
+};
+
+function cdcBookTitle(grade: number, subject: string, medium: ContentMedium): string {
+  const neat = subject.replace(/\s*\(Serofero\)\s*/i, "").trim();
+  if (medium === "ne") {
+    const neMap: Record<string, string> = {
+      Nepali: `नेपाली कक्षा ${grade}`,
+      Mathematics: `गणित कक्षा ${grade}`,
+      Science: `विज्ञान तथा प्रविधि कक्षा ${grade}`,
+      "Social Studies": `सामाजिक अध्ययन कक्षा ${grade}`,
+      "Health & Physical Education": `स्वास्थ्य तथा शारीरिक शिक्षा कक्षा ${grade}`,
+      "Creative Arts": `सृजनात्मक कला कक्षा ${grade}`,
+      "Science (Serofero)": `सेरोफेरो कक्षा ${grade}`,
+    };
+    return neMap[subject] || neMap[neat] || `${neat} कक्षा ${grade}`;
+  }
+  if (/Serofero/i.test(subject)) return `Serofero (Our Surroundings) Grade ${grade}`;
+  if (neat === "Science") return `Science and Technology Grade ${grade}`;
+  return `${neat} Grade ${grade}`;
+}
+
+function buildCdcCatalog(): ContentCatalogEntry[] {
+  const out: ContentCatalogEntry[] = [];
+  for (let grade = 1; grade <= 10; grade++) {
+    for (const subject of CDC_SUBJECTS_BY_GRADE[grade] ?? []) {
+      for (const medium of ["en", "ne"] as ContentMedium[]) {
+        // Nepali subject is primarily Nepali-medium; still list both for picker clarity
+        const key = `${grade}|${subject.replace(/\s*\(Serofero\)\s*/i, "Science").trim()}|${medium}`;
+        const keyAlt = `${grade}|${subject}|${medium}`;
+        const units = VERIFIED_CDC_UNITS[key] || VERIFIED_CDC_UNITS[keyAlt];
+        out.push(
+          e("cdc", grade, subject, medium, cdcBookTitle(grade, subject, medium), {
+            unitTitles: units,
+            sourcePageUrl:
+              grade === 10 && subject === "Optional Math"
+                ? "https://moecdc.gov.np/content/656/elective-mathematics-class-10--corrected-copy-/"
+                : CDC_HOME,
+          })
+        );
+      }
+    }
+  }
+  return out;
+}
+
+/** Sparse extras for non-CDC sources + full CDC grade×subject grid. */
+export const CONTENT_CATALOG: ContentCatalogEntry[] = [
+  ...buildCdcCatalog(),
+
+  // CEHRD / Sikai Chautari — portal links (no invented chapter lists)
+  e("cehrd", 1, "Nepali", "ne", "सिकाई चौतारी — कक्षा १"),
+  e("cehrd", 1, "English", "en", "Sikai Chautari — Class 1 English"),
+  e("cehrd", 1, "Mathematics", "en", "Sikai Chautari — Class 1 Mathematics"),
+  e("cehrd", 1, "Science (Serofero)", "en", "Sikai Chautari — Class 1 Serofero"),
+  e("cehrd", 6, "Science", "en", "Sikai Chautari — Class 6 Science"),
+  e("cehrd", 6, "Social Studies", "en", "Sikai Chautari — Class 6 Social Studies"),
+  e("cehrd", 8, "Science", "en", "Sikai Chautari — Class 8 Science"),
   e("cehrd", 9, "Science", "en", "Sikai Chautari — Class 9 Science"),
   e("cehrd", 10, "Science", "en", "Sikai Chautari — Class 10 Science"),
-  e("cehrd", 5, "English", "en", "Sikai Chautari — Class 5 English"),
-  e("cehrd", 6, "Nepali", "ne", "सिकाई चौतारी — कक्षा ६ नेपाली"),
 
   // e-Pustakalaya
   e("epustakalaya", 1, "English", "en", "e-Pustakalaya — Early readers (English)"),
+  e("epustakalaya", 1, "Nepali", "ne", "e-Pustakalaya — बाल सामग्री"),
   e("epustakalaya", 2, "Nepali", "ne", "e-Pustakalaya — बाल कथा (नेपाली)"),
-  e("epustakalaya", 4, "Science", "en", "e-Pustakalaya — Science stories Grade 4"),
   e("epustakalaya", 6, "Social Studies", "en", "e-Pustakalaya — Social Studies readers"),
   e("epustakalaya", 8, "English", "en", "e-Pustakalaya — Middle school English"),
 
-  // DLC video lessons (Class 4–11)
-  e("dlc", 4, "Mathematics", "en", "DLC Video — Class 4 Mathematics", {
-    unitTitles: ["Numbers", "Operations", "Geometry intro", "Measurement"],
-  }),
-  e("dlc", 5, "Science", "en", "DLC Video — Class 5 Science", {
-    unitTitles: ["Living world", "Materials", "Energy", "Earth"],
-  }),
+  // DLC video lessons (Class 4–11) — clearly not official curriculum PDFs
+  e("dlc", 4, "Mathematics", "en", "DLC Video — Class 4 Mathematics"),
+  e("dlc", 5, "Science", "en", "DLC Video — Class 5 Science"),
   e("dlc", 6, "Science", "en", "DLC Video — Class 6 Science"),
-  e("dlc", 7, "Science", "en", "DLC Video — Class 7 Science"),
+  e("dlc", 6, "Social Studies", "en", "DLC Video — Class 6 Social Studies"),
   e("dlc", 8, "Science", "en", "DLC Video — Class 8 Science", {
-    unitTitles: [
-      "Scientific Learning",
-      "ICT",
-      "Living Beings",
-      "Biodiversity",
-      "Life Process",
-      "Force and Motion",
-      "Energy",
-      "Electricity",
-      "Matter",
-      "Materials",
-      "Earth and Universe",
-    ],
+    unitTitles: VERIFIED_CDC_UNITS["8|Science|en"],
   }),
-  e("dlc", 8, "Mathematics", "en", "DLC Video — Class 8 Mathematics"),
   e("dlc", 9, "Science", "en", "DLC Video — Class 9 Science"),
   e("dlc", 10, "Science", "en", "DLC Video — Class 10 Science"),
   e("dlc", 11, "Science", "en", "DLC Video — Class 11 Science"),
@@ -204,11 +242,26 @@ export function listSourceIds(): ContentSourceId[] {
 }
 
 export function listContentGrades(source?: ContentSourceId): number[] {
-  const rows = source ? CONTENT_CATALOG.filter((x) => x.source === source) : CONTENT_CATALOG;
-  return [...new Set(rows.map((e) => e.grade))].sort((a, b) => a - b);
+  if (!source || source === "cdc") return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (source === "dlc") return [4, 5, 6, 7, 8, 9, 10, 11];
+  const rows = CONTENT_CATALOG.filter((x) => x.source === source);
+  const grades = [...new Set(rows.map((e) => e.grade))].sort((a, b) => a - b);
+  return grades.length ? grades : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 }
 
+/** Subject picker: CDC uses confirmed grade-band structure (shown for any medium). */
 export function listContentSubjects(source: ContentSourceId, grade: number, medium: ContentMedium): string[] {
+  if (source === "cdc") {
+    return [...(CDC_SUBJECTS_BY_GRADE[grade] ?? [])];
+  }
+  if (source === "cehrd") {
+    // Same structure as CDC for picker; catalog rows may be sparse
+    return CDC_SUBJECTS_BY_GRADE[grade] ?? listFromCatalog(source, grade, medium);
+  }
+  return listFromCatalog(source, grade, medium);
+}
+
+function listFromCatalog(source: ContentSourceId, grade: number, medium: ContentMedium): string[] {
   return [
     ...new Set(
       CONTENT_CATALOG.filter(
@@ -227,7 +280,7 @@ export function findContentEntry(
   subject: string,
   medium: ContentMedium
 ): ContentCatalogEntry | undefined {
-  return (
+  const hit =
     CONTENT_CATALOG.find(
       (e) => e.source === source && e.grade === grade && e.subject === subject && e.medium === medium
     ) ||
@@ -237,7 +290,28 @@ export function findContentEntry(
         e.grade === grade &&
         e.subject === subject &&
         (e.medium === "any" || medium === "any")
-    )
+    );
+  if (hit) return hit;
+
+  // On-demand stub so Grade 1 (etc.) always importable even if a row is missing
+  if (source === "cdc" && (CDC_SUBJECTS_BY_GRADE[grade] ?? []).includes(subject)) {
+    const scienceKey = subject.replace(/\s*\(Serofero\)\s*/i, "Science").trim();
+    const units =
+      VERIFIED_CDC_UNITS[`${grade}|${scienceKey}|${medium}`] ||
+      VERIFIED_CDC_UNITS[`${grade}|${subject}|${medium}`];
+    return e("cdc", grade, subject, medium, cdcBookTitle(grade, subject, medium), {
+      unitTitles: units,
+      sourcePageUrl: CDC_HOME,
+    });
+  }
+  return undefined;
+}
+
+export function hasVerifiedUnits(grade: number, subject: string, medium: ContentMedium): boolean {
+  const scienceKey = subject.replace(/\s*\(Serofero\)\s*/i, "Science").trim();
+  return !!(
+    VERIFIED_CDC_UNITS[`${grade}|${scienceKey}|${medium}`] ||
+    VERIFIED_CDC_UNITS[`${grade}|${subject}|${medium}`]
   );
 }
 
