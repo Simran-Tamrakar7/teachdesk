@@ -870,7 +870,11 @@ export const useAppStore = create<AppState>()(
         removeMaterial: (id) => {
           const m = get().materials.find((x) => x.id === id);
           if (!m) return;
-          set({ materials: get().materials.filter((x) => x.id !== id) });
+          set({
+            materials: get().materials.filter((x) => x.id !== id),
+            // Keep chapter cards in sync when a book is deleted
+            chapters: get().chapters.filter((c) => c.materialId !== id),
+          });
           audit("remove_material", m.title);
         },
         addChapters: (chs) => set({ chapters: [...get().chapters, ...chs] }),

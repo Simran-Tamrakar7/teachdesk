@@ -7,6 +7,7 @@ export type AiKind =
   | "glossary"
   | "quiz"
   | "lesson"
+  | "syllabus"
   | "rubric"
   | "auto-grade"
   | "parent"

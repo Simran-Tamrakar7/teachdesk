@@ -777,3 +777,93 @@ export async function generateParentUpdateLive(studentName: string, attendancePc
     }
   );
 }
+
+export type SyllabusUnitDraft = { title: string; topics: string[]; body: string };
+
+/** AI syllabus / chapter outline for a Nepal CDC-aligned grade+subject (or free-text request). */
+export async function generateSyllabusContent(opts: {
+  grade: string;
+  subject: string;
+  medium?: ContentLang;
+  mode: "full" | "free";
+  freeText?: string;
+}): Promise<{ title: string; units: SyllabusUnitDraft[] }> {
+  const grade = opts.grade;
+  const subject = opts.subject;
+  const medium = opts.medium ?? "en";
+  const prompt =
+    opts.mode === "full"
+      ? `Create a chapter-by-chapter teaching syllabus for Nepal Class ${grade} ${subject} (${medium === "ne" ? "Nepali" : "English"} medium), aligned with the CDC curriculum where possible.
+Return plain text only in this exact format (no markdown fences):
+TITLE: <syllabus title>
+UNIT 1: <chapter title>
+- topic
+- topic
+UNIT 2: <chapter title>
+- topic
+Include 8–12 units with 3–6 topics each. Keep titles classroom-ready.`
+      : `Teacher request for Class ${grade} ${subject}:
+${opts.freeText || "Create a useful syllabus outline."}
+
+Return plain text only:
+TITLE: <title>
+UNIT 1: <chapter title>
+- topic
+UNIT 2: ...
+Create as many units as needed (at least 1).`;
+
+  const raw = await withAiOrFallback(
+    "syllabus",
+    prompt,
+    () => {
+      const seedTitles =
+        /science/i.test(subject)
+          ? [
+              "Scientific Learning",
+              "Living Beings",
+              "Environment",
+              "Force and Motion",
+              "Energy",
+              "Matter",
+              "Earth and Space",
+            ]
+          : /math/i.test(subject)
+            ? ["Numbers", "Operations", "Fractions", "Geometry", "Measurement", "Data"]
+            : ["Foundations", "Core ideas", "Practice", "Local context", "Review", "Project"];
+      const units = seedTitles.map(
+        (t, i) =>
+          `UNIT ${i + 1}: ${t}\n- Key concepts\n- Classroom activity\n- Check for understanding`
+      );
+      return `TITLE: Class ${grade} ${subject} — draft syllabus\n${units.join("\n")}`;
+    },
+    "You help Nepali school teachers draft CDC-aligned syllabi. Output only the TITLE/UNIT format requested."
+  );
+
+  const titleMatch = raw.match(/^TITLE:\s*(.+)$/im);
+  const title = titleMatch?.[1]?.trim() || `Class ${grade} ${subject} — AI syllabus`;
+  const units: SyllabusUnitDraft[] = [];
+  const parts = raw.split(/\n(?=UNIT\s+\d+)/i);
+  for (const part of parts) {
+    const hm = part.match(/^UNIT\s+(\d+):\s*(.+)$/im);
+    if (!hm) continue;
+    const uTitle = hm[2].trim();
+    const topics = part
+      .split("\n")
+      .slice(1)
+      .map((l) => l.replace(/^[-•*]\s*/, "").trim())
+      .filter((l) => l && !/^UNIT\s+/i.test(l) && !/^TITLE:/i.test(l));
+    const body = `Unit ${hm[1]}: ${uTitle}\n\nTopics:\n${topics.map((t) => `• ${t}`).join("\n") || "• (Add topics)"}\n\nReview before teaching — AI-generated draft, not an official CDC textbook.`;
+    units.push({ title: uTitle, topics, body });
+  }
+
+  if (!units.length) {
+    units.push({
+      title: `${subject} overview`,
+      topics: ["Core ideas", "Practice", "Review"],
+      body: `${raw.slice(0, 2000)}\n\nReview before teaching — AI-generated draft.`,
+    });
+  }
+
+  return { title, units };
+}
+

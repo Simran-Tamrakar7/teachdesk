@@ -104,10 +104,16 @@ export type Material = {
   lang?: ContentLang;
   deletedAt?: string | null;
   collection?: string;
-  /** upload = teacher file; cdc = Official CDC import */
-  sourceKind?: "upload" | "cdc";
+  /** Where the book came from */
+  sourceKind?: "upload" | "cdc" | "cehrd" | "epustakalaya" | "dlc" | "ai" | "syllabus";
+  sourceLabel?: string;
   sourceUrl?: string;
   official?: boolean;
+  /** filename|size for duplicate detection */
+  fileFingerprint?: string;
+  fileSizeBytes?: number;
+  /** Shown disclaimer for AI / draft material */
+  disclaimer?: string;
 };
 
 export type LessonPlan = {

@@ -17,13 +17,19 @@ export async function GET(req: NextRequest) {
   }
 
   const host = parsed.hostname.toLowerCase();
+  // Official / listed sources only (CDC, CEHRD, OLE/e-Pustakalaya, DLC)
   const allowed =
     host.endsWith("moecdc.gov.np") ||
     host.endsWith("gov.np") ||
+    host.endsWith("cehrd.gov.np") ||
+    host.endsWith("olenepal.org") ||
+    host.endsWith("dwit.edu.np") ||
     host.includes("giwmscdnone") ||
-    host.includes("cdc");
+    host.includes("cdc") ||
+    host.includes("epustakalaya") ||
+    host.includes("sikai");
   if (!allowed) {
-    return NextResponse.json({ error: "URL host not allowed for CDC import." }, { status: 403 });
+    return NextResponse.json({ error: "URL host not allowed for content import." }, { status: 403 });
   }
 
   try {
