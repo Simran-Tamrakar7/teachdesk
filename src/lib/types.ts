@@ -104,6 +104,10 @@ export type Material = {
   lang?: ContentLang;
   deletedAt?: string | null;
   collection?: string;
+  /** upload = teacher file; cdc = Official CDC import */
+  sourceKind?: "upload" | "cdc";
+  sourceUrl?: string;
+  official?: boolean;
 };
 
 export type LessonPlan = {

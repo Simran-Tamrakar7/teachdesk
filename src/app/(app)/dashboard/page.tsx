@@ -3,9 +3,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/lib/store";
 import { average, formatDate } from "@/lib/utils";
-import { buildAiTodos, buildDailyBriefing, buildSmartAlerts, factOfTheDay, activityOfTheDay, forecastGrade, generateParentUpdate, weeklyDigest } from "@/lib/dashboard-ai";
+import { buildAiTodos, buildDailyBriefing, buildSmartAlerts, factOfTheDay, activityOfTheDay, forecastGrade, weeklyDigest } from "@/lib/dashboard-ai";
 import { calcAttendancePct, visibleClasses, visibleStudents } from "@/lib/rbac";
-import { generateLessonPlan, generateQuizFromChapter } from "@/lib/ai";
+import { generateLessonPlan, generateParentUpdateLive, generateQuizFromChapter } from "@/lib/ai";
 import {
   AlertCircle,
   BookMarked,
@@ -65,7 +65,13 @@ export default function DashboardPage() {
   const todos = buildAiTodos({ openReminders, alerts, todaysClasses, pendingSubmissions: pendingGrading.length });
   async function tomorrowLesson() { const chapter = chapters[0]; if (!chapter) return; const plan = await generateLessonPlan(chapter); addLessonPlan({ id: `lp-${Date.now()}`, classId: chapter.classId, chapterId: chapter.id, date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), durationMins: 45, ...plan }); pushAiLog({ kind: "lesson", title: plan.title, preview: "Generated from dashboard" }); }
   async function quickQuiz() { const chapter = chapters[0]; if (!chapter) return; const questions = await generateQuizFromChapter(chapter); addAssessment({ id: `a-${Date.now()}`, title: `Quick quiz: ${chapter.title}`, classId: chapter.classId, subject: classes.find((c) => c.id === chapter.classId)?.subject ?? "Science", chapterId: chapter.id, chapterIds: [chapter.id], type: "quiz", maxMarks: questions.reduce((n, q) => n + q.marks, 0), date: new Date().toISOString().slice(0, 10), term: "Term 1", questions: questions.map((q, i) => ({ ...q, id: `q-${i}` })) }); pushAiLog({ kind: "quiz", title: chapter.title, preview: "Generated quick quiz" }); }
-  function parentDraft() { const student = flagged[0]; if (!student) return; addNote({ title: `Parent update: ${student.name}`, body: generateParentUpdate(student.name, calcAttendancePct(student.id, attendance)), studentId: student.id, classId: student.classId, pinned: false }); pushAiLog({ kind: "parent", title: student.name, preview: "Saved parent update draft" }); }
+  async function parentDraft() {
+    const student = flagged[0];
+    if (!student) return;
+    const body = await generateParentUpdateLive(student.name, calcAttendancePct(student.id, attendance));
+    addNote({ title: `Parent update: ${student.name}`, body, studentId: student.id, classId: student.classId, pinned: false });
+    pushAiLog({ kind: "parent", title: student.name, preview: "Saved parent update draft" });
+  }
 
   const quiz = assessments.find((a) => a.id === "a1");
   const quizGrades = grades.filter((g) => g.assessmentId === "a1");

@@ -1,7 +1,38 @@
 import type { Assessment, Chapter, ChapterLocale, ChatMessage, ContentLang } from "./types";
+import { AiRequestError, callAi } from "./llm";
 
 function delay(ms = 700) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function withAiOrFallback(kind: Parameters<typeof callAi>[0], prompt: string, fallback: () => Promise<string> | string, system?: string): Promise<string> {
+  try {
+    return await callAi(kind, prompt, system);
+  } catch (e) {
+    if (e instanceof AiRequestError && !e.retryable) {
+      // Not configured — silent stub
+      const f = fallback();
+      return typeof f === "string" ? f : await f;
+    }
+    // Network/API failure: still fall back so UI works, but prefix a note
+    const f = fallback();
+    const text = typeof f === "string" ? f : await f;
+    const msg = e instanceof Error ? e.message : "AI unavailable";
+    return `${text}\n\n—\n(Offline/stub result — live AI failed: ${msg}. Use Regenerate after checking ANTHROPIC_API_KEY.)`;
+  }
+}
+
+function chapterContext(chapter: Chapter, max = 8000): string {
+  const body = (chapter.body || chapter.summary || "").slice(0, max);
+  return `Chapter: ${chapter.title} (unit ${chapter.unitNumber})
+Pages: ${chapter.pageStart ?? "?"}–${chapter.pageEnd ?? "?"}
+Summary: ${chapter.summary}
+Key terms: ${chapter.keyTerms.join(", ") || "—"}
+Objectives: ${chapter.objectives.join("; ") || "—"}
+Discussion: ${chapter.discussionQuestions.join("; ") || "—"}
+
+TEXT:
+${body}`;
 }
 
 function firstSentences(text: string, n = 2): string {
@@ -420,15 +451,24 @@ export function viewChapter(
 }
 
 export async function summarizeChapter(chapter: Chapter): Promise<string> {
-  await delay();
-  const body = chapter.body?.slice(0, 500) ?? chapter.summary;
-  return `${chapter.title} covers the core ideas in plain language: ${chapter.summary} Teachers can use this unit to connect ${chapter.keyTerms.slice(0, 3).join(", ") || "key vocabulary"} to classroom examples. ${body ? `From the text: ${firstSentences(body, 2)}` : ""}`.trim();
+  const stub = async () => {
+    await delay();
+    const body = chapter.body?.slice(0, 500) ?? chapter.summary;
+    return `${chapter.title} covers the core ideas in plain language: ${chapter.summary} Teachers can use this unit to connect ${chapter.keyTerms.slice(0, 3).join(", ") || "key vocabulary"} to classroom examples. ${body ? `From the text: ${firstSentences(body, 2)}` : ""}`.trim();
+  };
+  return withAiOrFallback(
+    "summarize",
+    `Write a short plain-language paragraph summary (5–8 sentences) a teacher can read before class.\n\n${chapterContext(chapter)}`,
+    stub,
+    "You summarize school textbook chapters for teachers. No fluff."
+  );
 }
 
 export async function explainChapterSimply(chapter: Chapter): Promise<string> {
-  await delay(800);
-  const terms = chapter.keyTerms.slice(0, 4);
-  return `Think of “${chapter.title}” like this:
+  const stub = async () => {
+    await delay(800);
+    const terms = chapter.keyTerms.slice(0, 4);
+    return `Think of “${chapter.title}” like this:
 
 1. Big idea — ${chapter.summary}
 2. Words to know — ${terms.length ? terms.join(", ") : "the main vocabulary in the chapter"}
@@ -436,65 +476,108 @@ export async function explainChapterSimply(chapter: Chapter): Promise<string> {
 4. How to check understanding — ask: ${chapter.discussionQuestions[0] ?? "What is the main idea in your own words?"}
 
 Hard bits made easier: read one short section, underline new words, then retell the idea to a partner.`;
+  };
+  return withAiOrFallback(
+    "explain",
+    `Explain this chapter simply for beginners (Class/Grade school). Use numbered steps, analogies, and plain words.\n\n${chapterContext(chapter)}`,
+    stub
+  );
 }
 
 export async function chapterPointersText(chapter: Chapter): Promise<string> {
-  await delay(700);
-  const points =
-    chapter.pointers?.length
-      ? chapter.pointers
-      : [
-          chapter.summary,
-          ...chapter.objectives.slice(0, 3),
-          ...(chapter.keyTerms.slice(0, 4).map((t) => `Know the term: ${t}`)),
-        ];
-  return points.map((p, i) => `• ${p}`).join("\n");
+  const stub = async () => {
+    await delay(700);
+    const points =
+      chapter.pointers?.length
+        ? chapter.pointers
+        : [
+            chapter.summary,
+            ...chapter.objectives.slice(0, 3),
+            ...chapter.keyTerms.slice(0, 4).map((t) => `Know the term: ${t}`),
+          ];
+    return points.map((p) => `• ${p}`).join("\n");
+  };
+  return withAiOrFallback(
+    "pointers",
+    `List 6–10 board-ready key points as bullets (• ). Short phrases a teacher can write on the board.\n\n${chapterContext(chapter)}`,
+    stub
+  );
 }
 
 export async function chapterGlossaryText(chapter: Chapter): Promise<string> {
-  await delay(700);
-  const terms = chapter.keyTerms.length ? chapter.keyTerms : ["Concept", "Example", "Practice"];
-  return terms
-    .map((t) => `${t} — A key idea in “${chapter.title}”; students should use it correctly in a short sentence about the lesson.`)
-    .join("\n\n");
+  const stub = async () => {
+    await delay(700);
+    const terms = chapter.keyTerms.length ? chapter.keyTerms : ["Concept", "Example", "Practice"];
+    return terms
+      .map((t) => `${t} — A key idea in “${chapter.title}”; students should use it correctly in a short sentence about the lesson.`)
+      .join("\n\n");
+  };
+  return withAiOrFallback(
+    "glossary",
+    `Create a glossary of 6–12 important terms from this chapter. Format each as:\nTerm — short student-friendly definition.\n\n${chapterContext(chapter)}`,
+    stub
+  );
 }
 
 export async function generateQuizFromChapter(
   chapter: Chapter
 ): Promise<{ type: "mcq" | "short" | "long"; prompt: string; options?: string[]; answer?: string; marks: number }[]> {
-  await delay(900);
-  return [
-    {
-      type: "mcq",
-      prompt: `Which concept is central to ${chapter.title}?`,
-      options: [chapter.keyTerms[0] ?? "Concept A", chapter.keyTerms[1] ?? "Concept B", "None of these", "All of the above"],
-      answer: chapter.keyTerms[0],
-      marks: 2,
-    },
-    {
-      type: "mcq",
-      prompt: `A learning goal for this chapter is closest to:`,
-      options: [chapter.objectives[0], "Memorize the textbook cover", "Skip the lab", "Ignore diagrams"],
-      answer: chapter.objectives[0],
-      marks: 2,
-    },
-    {
-      type: "short",
-      prompt: `Define: ${chapter.keyTerms[0] ?? "key term"}`,
-      answer: `Student-friendly definition of ${chapter.keyTerms[0]}`,
-      marks: 4,
-    },
-    {
-      type: "short",
-      prompt: chapter.discussionQuestions[0] ?? "Explain the main idea of this chapter.",
-      marks: 4,
-    },
-    {
-      type: "long",
-      prompt: `Write a short paragraph explaining ${chapter.title} using at least two of these terms: ${chapter.keyTerms.slice(0, 3).join(", ")}.`,
-      marks: 8,
-    },
-  ];
+  const stub = async () => {
+    await delay(900);
+    return [
+      {
+        type: "mcq" as const,
+        prompt: `Which concept is central to ${chapter.title}?`,
+        options: [chapter.keyTerms[0] ?? "Concept A", chapter.keyTerms[1] ?? "Concept B", "None of these", "All of the above"],
+        answer: chapter.keyTerms[0],
+        marks: 2,
+      },
+      {
+        type: "mcq" as const,
+        prompt: `A learning goal for this chapter is closest to:`,
+        options: [chapter.objectives[0], "Memorize the textbook cover", "Skip the lab", "Ignore diagrams"],
+        answer: chapter.objectives[0],
+        marks: 2,
+      },
+      {
+        type: "short" as const,
+        prompt: `Define: ${chapter.keyTerms[0] ?? "key term"}`,
+        answer: `Student-friendly definition of ${chapter.keyTerms[0]}`,
+        marks: 4,
+      },
+      {
+        type: "short" as const,
+        prompt: chapter.discussionQuestions[0] ?? "Explain the main idea of this chapter.",
+        marks: 4,
+      },
+      {
+        type: "long" as const,
+        prompt: `Write a short paragraph explaining ${chapter.title} using at least two of these terms: ${chapter.keyTerms.slice(0, 3).join(", ")}.`,
+        marks: 8,
+      },
+    ];
+  };
+
+  try {
+    const raw = await callAi(
+      "quiz",
+      `Create a 5-question quiz from this chapter. Return ONLY valid JSON array, no markdown. Each item: {"type":"mcq"|"short"|"long","prompt":"...","options":["..."] (mcq only),"answer":"...","marks":number}\n\n${chapterContext(chapter)}`
+    );
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        type: "mcq" | "short" | "long";
+        prompt: string;
+        options?: string[];
+        answer?: string;
+        marks: number;
+      }[];
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch {
+    /* fall through */
+  }
+  return stub();
 }
 
 export async function generateLessonPlan(chapter: Chapter): Promise<{
@@ -503,18 +586,35 @@ export async function generateLessonPlan(chapter: Chapter): Promise<{
   activities: { time: string; title: string; detail: string }[];
   homework: string;
 }> {
-  await delay(1000);
-  return {
-    title: `Lesson: ${chapter.title}`,
-    objectives: chapter.objectives.slice(0, 3),
-    activities: [
-      { time: "0–5 min", title: "Hook", detail: chapter.discussionQuestions[0] ?? "Open with a curiosity question" },
-      { time: "5–20 min", title: "Teach", detail: `Direct instruction on ${chapter.keyTerms.slice(0, 3).join(", ")}` },
-      { time: "20–35 min", title: "Practice", detail: "Pair work: apply concepts to a real-world scenario" },
-      { time: "35–45 min", title: "Check for understanding", detail: "Exit ticket based on objectives" },
-    ],
-    homework: `Review notes on ${chapter.title}; answer 2 discussion questions.`,
+  const stub = async () => {
+    await delay(1000);
+    return {
+      title: `Lesson: ${chapter.title}`,
+      objectives: chapter.objectives.slice(0, 3),
+      activities: [
+        { time: "0–5 min", title: "Hook", detail: chapter.discussionQuestions[0] ?? "Open with a curiosity question" },
+        { time: "5–20 min", title: "Teach", detail: `Direct instruction on ${chapter.keyTerms.slice(0, 3).join(", ")}` },
+        { time: "20–35 min", title: "Practice", detail: "Pair work: apply concepts to a real-world scenario" },
+        { time: "35–45 min", title: "Check for understanding", detail: "Exit ticket based on objectives" },
+      ],
+      homework: `Review notes on ${chapter.title}; answer 2 discussion questions.`,
+    };
   };
+
+  try {
+    const raw = await callAi(
+      "lesson",
+      `Design a 45-minute lesson plan. Return ONLY JSON: {"title":"...","objectives":["..."],"activities":[{"time":"...","title":"...","detail":"..."}],"homework":"..."}\n\n${chapterContext(chapter)}`
+    );
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as Awaited<ReturnType<typeof generateLessonPlan>>;
+      if (parsed?.title && Array.isArray(parsed.activities)) return parsed;
+    }
+  } catch {
+    /* fall through */
+  }
+  return stub();
 }
 
 export async function generatePointersAndSlides(chapter: Chapter): Promise<{
@@ -568,24 +668,27 @@ export async function askDocument(question: string, docTitle: string, preview: s
 }
 
 export async function assistantReply(prompt: string): Promise<string> {
-  await delay(750);
-  const p = prompt.toLowerCase();
-  if (p.includes("quiz") || p.includes("mcq")) {
-    return `Here's a quick 5-question starter set you can customize:\n\n1. (MCQ) Which statement is true?\n2. (MCQ) Identify the correct example.\n3. (Short) Define the key term in one sentence.\n4. (Short) Give one real-world application.\n5. (Long) Explain the process step-by-step.`;
-  }
-  if (p.includes("email") || p.includes("parent")) {
-    return `Draft parent email:\n\nSubject: Quick update on your child's progress\n\nDear Parent/Guardian,\n\nI wanted to share a brief update. Your child has been engaged in recent work. One area to practice at home is reviewing key vocabulary for 5–10 minutes.\n\nWarm regards,\n[Your name]`;
-  }
-  if (p.includes("rubric")) {
-    return `Simple 4-level rubric (content + clarity):\n\n**4 — Excellent** **3 — Proficient** **2 — Developing** **1 — Beginning**`;
-  }
-  if (p.includes("translate") || p.includes("nepali")) {
-    return `Nepali (draft):\nबिरुवाले सूर्यको प्रकाशबाट आफ्नो खाना बनाउँछन्। यस प्रक्रियालाई प्रकाश संश्लेषण भनिन्छ।\n\n(Review with a language specialist before distributing.)`;
-  }
-  if (p.includes("grade") || p.includes("mark")) {
-    return `Auto-grading suggestion (demo):\nSuggested mark: 3/4\nRationale: Correct main idea; missing one key term.`;
-  }
-  return `I can help with quizzes, lesson plans, rubrics, parent emails, worksheets, translations, and “how do I teach X?”.\n\nYou asked: “${prompt}”`;
+  const stub = async () => {
+    await delay(750);
+    const p = prompt.toLowerCase();
+    if (p.includes("quiz") || p.includes("mcq")) {
+      return `Here's a quick 5-question starter set you can customize:\n\n1. (MCQ) Which statement is true?\n2. (MCQ) Identify the correct example.\n3. (Short) Define the key term in one sentence.\n4. (Short) Give one real-world application.\n5. (Long) Explain the process step-by-step.`;
+    }
+    if (p.includes("email") || p.includes("parent")) {
+      return `Draft parent email:\n\nSubject: Quick update on your child's progress\n\nDear Parent/Guardian,\n\nI wanted to share a brief update. Your child has been engaged in recent work. One area to practice at home is reviewing key vocabulary for 5–10 minutes.\n\nWarm regards,\n[Your name]`;
+    }
+    if (p.includes("rubric")) {
+      return `Simple 4-level rubric (content + clarity):\n\n**4 — Excellent** **3 — Proficient** **2 — Developing** **1 — Beginning**`;
+    }
+    if (p.includes("translate") || p.includes("nepali")) {
+      return `Nepali (draft):\nबिरुवाले सूर्यको प्रकाशबाट आफ्नो खाना बनाउँछन्। यस प्रक्रियालाई प्रकाश संश्लेषण भनिन्छ।\n\n(Review with a language specialist before distributing.)`;
+    }
+    if (p.includes("grade") || p.includes("mark")) {
+      return `Auto-grading suggestion (demo):\nSuggested mark: 3/4\nRationale: Correct main idea; missing one key term.`;
+    }
+    return `I can help with quizzes, lesson plans, rubrics, parent emails, worksheets, translations, and “how do I teach X?”.\n\nYou asked: “${prompt}”`;
+  };
+  return withAiOrFallback("assistant", prompt, stub);
 }
 
 export function letterGrade(pct: number): string {
@@ -598,10 +701,11 @@ export function letterGrade(pct: number): string {
 }
 
 export async function suggestExamRubric(assessment: Assessment): Promise<string> {
-  await delay(800);
-  const paper = assessment.paper?.fileName ?? "uploaded paper";
-  const pass = assessment.passMark ?? Math.ceil(assessment.maxMarks * 0.4);
-  return `Marking rubric for **${assessment.title}** (based on ${paper})
+  const stub = async () => {
+    await delay(800);
+    const paper = assessment.paper?.fileName ?? "uploaded paper";
+    const pass = assessment.passMark ?? Math.ceil(assessment.maxMarks * 0.4);
+    return `Marking rubric for **${assessment.title}** (based on ${paper})
 
 **Total:** ${assessment.maxMarks} · **Pass:** ${pass}+
 
@@ -617,12 +721,36 @@ export async function suggestExamRubric(assessment: Assessment): Promise<string>
 • 1 — Major misconceptions
 
 (Demo AI — review before using with students.)`;
+  };
+  return withAiOrFallback(
+    "rubric",
+    `Write a practical marking rubric for this exam.
+Title: ${assessment.title}
+Max marks: ${assessment.maxMarks}
+Pass mark: ${assessment.passMark ?? "—"}
+Paper: ${assessment.paper?.fileName ?? "n/a"}
+Questions: ${JSON.stringify(assessment.questions?.slice(0, 12) ?? [])}`,
+    stub
+  );
 }
 
 export async function suggestObjectiveMarks(
   assessment: Assessment,
   studentIds: string[]
 ): Promise<{ studentId: string; suggested: number; note: string }[]> {
+  try {
+    const raw = await callAi(
+      "auto-grade",
+      `Suggest objective marks for ${studentIds.length} students on "${assessment.title}" (max ${assessment.maxMarks}). Return ONLY JSON array: [{"studentId":"...","suggested":number,"note":"..."}]. Student ids: ${studentIds.slice(0, 12).join(", ")}. Questions: ${JSON.stringify(assessment.questions?.slice(0, 8) ?? [])}`
+    );
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as { studentId: string; suggested: number; note: string }[];
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch {
+    /* stub */
+  }
   await delay(900);
   const mcqMarks = assessment.questions.filter((q) => q.type === "mcq").reduce((n, q) => n + q.marks, 0);
   const base = mcqMarks || Math.round(assessment.maxMarks * 0.6);
@@ -633,8 +761,19 @@ export async function suggestObjectiveMarks(
       studentId,
       suggested,
       note: assessment.paper
-        ? `Objective assist from “${assessment.paper.fileName}” (demo).`
-        : "Objective assist (demo).",
+        ? `Objective assist from “${assessment.paper.fileName}” (local estimate).`
+        : "Objective assist (local estimate).",
     };
   });
+}
+
+export async function generateParentUpdateLive(studentName: string, attendancePct: number, extra?: string): Promise<string> {
+  return withAiOrFallback(
+    "parent",
+    `Draft a short, warm parent/guardian update email about student ${studentName}. Attendance about ${attendancePct}%. ${extra || ""} Keep under 150 words.`,
+    async () => {
+      await delay(400);
+      return `Dear Parent/Guardian,\n\nA quick update on ${studentName}: attendance is around ${attendancePct}%. Please encourage regular review of class notes for 10 minutes at home.\n\nWarm regards`;
+    }
+  );
 }

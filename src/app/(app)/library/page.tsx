@@ -8,6 +8,7 @@ import {
   translateChapterLocale,
   viewChapter,
 } from "@/lib/ai";
+import { CDC_PORTAL, findCdcEntry, listCdcGrades, listCdcSubjects, type CdcMedium } from "@/lib/cdc-catalog";
 import { useAppStore } from "@/lib/store";
 import type { Chapter, ContentLang, Material } from "@/lib/types";
 import {
@@ -51,7 +52,30 @@ export default function LibraryPage() {
   const removeLibraryBookmark = useAppStore((s) => s.removeLibraryBookmark);
   const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
 
-  const [classId, setClassId] = useState(() => classes.find((c) => c.id === "c1")?.id ?? classes[0]?.id ?? "");
+  const activeClasses = useMemo(() => classes.filter((c) => !c.deletedAt), [classes]);
+
+  /** Library is Class (grade) + Subject only — not school section A/B */
+  const libraryGroups = useMemo(() => {
+    const map = new Map<string, { key: string; grade: string; subject: string; classIds: string[]; primaryId: string }>();
+    for (const c of activeClasses) {
+      const key = `${c.grade}::${c.subject}`;
+      const cur = map.get(key);
+      if (cur) {
+        cur.classIds.push(c.id);
+      } else {
+        map.set(key, { key, grade: c.grade, subject: c.subject, classIds: [c.id], primaryId: c.id });
+      }
+    }
+    return [...map.values()].sort((a, b) => Number(a.grade) - Number(b.grade) || a.subject.localeCompare(b.subject));
+  }, [activeClasses]);
+
+  const defaultKey =
+    libraryGroups.find((g) => g.grade === "8" && /science/i.test(g.subject))?.key ?? libraryGroups[0]?.key ?? "";
+  const [groupKey, setGroupKey] = useState(defaultKey);
+  const group = libraryGroups.find((g) => g.key === groupKey) ?? libraryGroups[0];
+  const scopeClassIds = group?.classIds ?? [];
+  const classId = group?.primaryId ?? "";
+
   const [libTab, setLibTab] = useState<"content" | "bookmarks">("content");
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
   const [lang, setLang] = useState<ContentLang>("en");
@@ -72,28 +96,36 @@ export default function LibraryPage() {
   const [bmLink, setBmLink] = useState("");
   const [bmNote, setBmNote] = useState("");
   const [editingBm, setEditingBm] = useState<string | null>(null);
+  const [showCdc, setShowCdc] = useState(false);
+  const [cdcGrade, setCdcGrade] = useState(8);
+  const [cdcMedium, setCdcMedium] = useState<CdcMedium>("en");
+  const [cdcSubject, setCdcSubject] = useState("Science");
+  const [cdcMsg, setCdcMsg] = useState("");
+
+  const cdcSubjects = useMemo(() => listCdcSubjects(cdcGrade, cdcMedium), [cdcGrade, cdcMedium]);
 
   const classChapters = useMemo(
     () =>
       chapters
-        .filter((c) => c.classId === classId && !c.deletedAt)
+        .filter((c) => scopeClassIds.includes(c.classId) && !c.deletedAt)
         .sort((a, b) => a.unitNumber - b.unitNumber || a.title.localeCompare(b.title)),
-    [chapters, classId]
+    [chapters, scopeClassIds]
   );
 
   const filteredMaterials = materials.filter((m) => {
     if (m.deletedAt) return false;
-    if (m.classId !== classId) return false;
+    if (!scopeClassIds.includes(m.classId)) return false;
     if (selectedChapter && m.chapterId && m.chapterId !== selectedChapter) return false;
     if (tagFilter && !m.tags.some((t) => t.includes(tagFilter.toLowerCase()))) return false;
     return true;
   });
 
-  const classBookmarks = libraryBookmarks.filter((b) => b.classId === classId);
+  const classBookmarks = libraryBookmarks.filter((b) => scopeClassIds.includes(b.classId));
 
   const chapter = chapters.find((c) => c.id === selectedChapter && !c.deletedAt);
   const viewed = chapter ? viewChapter(chapter, lang) : null;
   const cls = classes.find((c) => c.id === classId);
+  const libraryLabel = group ? `Class ${group.grade} — ${group.subject}` : "Class";
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
@@ -227,7 +259,7 @@ export default function LibraryPage() {
   }
 
   async function extractAllBooks() {
-    const books = materials.filter((m) => !m.deletedAt && m.classId === classId);
+    const books = materials.filter((m) => !m.deletedAt && scopeClassIds.includes(m.classId));
     if (!books.length) {
       setAiNote("No books in this class yet — upload a textbook first.");
       return;
@@ -264,9 +296,148 @@ export default function LibraryPage() {
       total += detected.length;
     }
     setProgress({ pct: 100, label: "Done" });
-    setAiNote(`Extracted ${total} unit card(s) across ${books.length} book(s) for ${cls?.name ?? "this class"}.`);
+    setAiNote(`Extracted ${total} unit card(s) across ${books.length} book(s) for ${libraryLabel}.`);
     setBusy(null);
     setTimeout(() => setProgress(null), 700);
+  }
+
+  async function importFromCdc() {
+    const entry = findCdcEntry(cdcGrade, cdcSubject, cdcMedium);
+    if (!entry) {
+      setCdcMsg("No catalog entry for that grade/subject/medium. Try another combination or open CDC manually.");
+      return;
+    }
+    if (!classId) {
+      setCdcMsg("Select a class library first.");
+      return;
+    }
+    setBusy("cdc");
+    setCdcMsg("");
+    setProgress({ pct: 15, label: "Contacting CDC source…" });
+
+    let dataUrl: string | undefined;
+    let extracted = "";
+    let fetchError = "";
+
+    if (entry.pdfUrl) {
+      try {
+        const res = await fetch(`/api/cdc/fetch?url=${encodeURIComponent(entry.pdfUrl)}`);
+        const data = (await res.json()) as {
+          ok?: boolean;
+          dataUrl?: string;
+          textHint?: string;
+          error?: string;
+          tooLarge?: boolean;
+        };
+        if (res.ok && data.dataUrl) {
+          dataUrl = data.dataUrl;
+          extracted = data.textHint || "";
+        } else {
+          fetchError = data.error || `Could not download PDF (${res.status}).`;
+        }
+      } catch (e) {
+        fetchError = e instanceof Error ? e.message : "Network error";
+      }
+    } else {
+      fetchError = "No direct PDF URL on file for this title (CDC links change by year).";
+    }
+
+    setProgress({ pct: 55, label: "Building chapter cards…" });
+
+    const materialId = uid("m");
+    let chaptersOut: Chapter[] = [];
+
+    if (extracted.trim().length > 80) {
+      const detected = await splitTextbookIntoChapters(entry.title, extracted, {
+        classId,
+        subjectId: /science/i.test(entry.subject) ? "science" : "general",
+        materialId,
+        lang: entry.medium,
+        sourceBook: entry.title,
+      });
+      chaptersOut = detected.map((c) => ({ ...c, id: uid("ch"), sourceBook: entry.title, materialId, classId })) as Chapter[];
+    } else if (entry.unitTitles?.length) {
+      chaptersOut = entry.unitTitles.map((title, i) => ({
+        id: uid("ch"),
+        subjectId: /science/i.test(entry.subject) ? "science" : "general",
+        classId,
+        materialId,
+        title,
+        unitNumber: i + 1,
+        lang: entry.medium,
+        summary: `Official CDC unit — ${title}. Open the source link to read the full textbook; paste unit text here when ready.`,
+        keyTerms: [],
+        objectives: ["Read the official unit", "Note key vocabulary", "Prepare discussion questions"],
+        discussionQuestions: [`What is the main idea of “${title}”?`],
+        body: `Unit ${i + 1}: ${title}\n\nImported from CDC catalog. Full PDF may be large — open the Official source link, or paste chapter text into this unit.`,
+        wordCount: 40,
+        pageStart: i * 20 + 1,
+        pageEnd: (i + 1) * 20,
+        sourceBook: entry.title,
+      }));
+    } else {
+      chaptersOut = [
+        {
+          id: uid("ch"),
+          subjectId: "general",
+          classId,
+          materialId,
+          title: entry.title,
+          unitNumber: 1,
+          lang: entry.medium,
+          summary: "Official CDC listing imported. Download the PDF from the source page and paste text to split chapters.",
+          keyTerms: [],
+          objectives: ["Open official CDC textbook"],
+          discussionQuestions: ["Which units will you teach first?"],
+          body: `${entry.title}\n\nSource: ${entry.sourcePageUrl}`,
+          wordCount: 20,
+          pageStart: 1,
+          pageEnd: 10,
+          sourceBook: entry.title,
+        },
+      ];
+    }
+
+    const material: Material = {
+      id: materialId,
+      title: entry.title,
+      type: "pdf",
+      classId,
+      subject: entry.subject,
+      tags: ["cdc", "official", entry.medium, `grade-${entry.grade}`],
+      uploadedAt: new Date().toISOString(),
+      sizeLabel: dataUrl ? formatBytes(Math.round((dataUrl.length * 3) / 4)) : "CDC catalog",
+      contentPreview: (extracted || entry.title).slice(0, 500),
+      extractedText: extracted || undefined,
+      dataUrl,
+      mime: "application/pdf",
+      lang: entry.medium,
+      sourceKind: "cdc",
+      sourceUrl: entry.sourcePageUrl,
+      official: true,
+      versions: [
+        {
+          id: uid("mv"),
+          version: 1,
+          uploadedAt: new Date().toISOString(),
+          note: "Official — CDC import",
+          fileName: `${entry.id}.pdf`,
+        },
+      ],
+    };
+
+    addMaterial(material);
+    replaceChaptersForMaterial(materialId, chaptersOut);
+    setProgress({ pct: 100, label: "Done" });
+    setBusy(null);
+    setTimeout(() => setProgress(null), 600);
+    setShowCdc(false);
+    setAiNote(
+      fetchError
+        ? `Imported “${entry.title}” with ${chaptersOut.length} unit card(s). PDF fetch note: ${fetchError} Open ${entry.sourcePageUrl}`
+        : `Imported Official CDC “${entry.title}” · ${chaptersOut.length} unit(s).`
+    );
+    if (fetchError) setCdcMsg(`${fetchError} Verify at ${CDC_PORTAL}`);
   }
 
   function saveBookmark(e: React.FormEvent) {
@@ -387,7 +558,7 @@ export default function LibraryPage() {
       setAiNote("Not enough text in this chapter to re-split.");
       return;
     }
-    if (!confirm(`Re-split “${ch.title}” into smaller sections (best-guess)?`)) return;
+    if (!confirm(`Re-split “${ch.title}” into smaller units (best-guess)?`)) return;
     const subjectId = (cls?.subject ?? "social").toLowerCase().includes("social") ? "social" : "science";
     const parts = parseChaptersFromText(text, {
       classId: ch.classId,
@@ -410,14 +581,14 @@ export default function LibraryPage() {
         materialId: ch.materialId,
       })) as Chapter[]
     );
-    setAiNote(`Re-split into ${parts.length} sections. Rename or merge as needed.`);
+    setAiNote(`Re-split into ${parts.length} units. Rename or merge as needed.`);
   }
 
   return (
     <div>
       <PageHeader
         title="Content Library"
-        subtitle="Class → books → chapters. Bookmarks: label + link + note for this class."
+        subtitle="Class + subject → books → chapters. Bookmarks stay with the class library."
         actions={
           <>
             <div className="flex rounded-xl border border-line p-1">
@@ -434,26 +605,27 @@ export default function LibraryPage() {
             <button type="button" className="btn btn-primary" onClick={() => setShowUpload(true)}>
               <Upload size={16} /> Upload textbook
             </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowCdc(true)}>
+              Import from CDC
+            </button>
           </>
         }
       />
 
       <div className="mb-3 flex flex-wrap gap-2">
-        {classes
-          .filter((c) => !c.deletedAt)
-          .map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={`btn ${classId === c.id ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => {
-                setClassId(c.id);
-                setSelectedChapter(null);
-              }}
-            >
-              {c.name}
-            </button>
-          ))}
+        {libraryGroups.map((g) => (
+          <button
+            key={g.key}
+            type="button"
+            className={`btn ${group?.key === g.key ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => {
+              setGroupKey(g.key);
+              setSelectedChapter(null);
+            }}
+          >
+            Class {g.grade} — {g.subject}
+          </button>
+        ))}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -485,10 +657,10 @@ export default function LibraryPage() {
           type="button"
           className="btn btn-secondary"
           onClick={() => {
-            if (!confirm(`Clear library for ${cls?.name ?? "this class"}?`)) return;
-            clearClassLibrary(classId);
+            if (!confirm(`Clear library for ${libraryLabel}?`)) return;
+            for (const id of scopeClassIds) clearClassLibrary(id);
             setSelectedChapter(null);
-            setAiNote(`Cleared library for ${cls?.name ?? "this class"}.`);
+            setAiNote(`Cleared library for ${libraryLabel}.`);
           }}
         >
           <Eraser size={16} /> Clear class library
@@ -497,7 +669,7 @@ export default function LibraryPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <section className={`space-y-3 ${libTab === "bookmarks" ? "hidden xl:block" : ""}`}>
-          <div className="mb-1 text-sm font-semibold">Books · {cls?.name ?? "Class"}</div>
+          <div className="mb-1 text-sm font-semibold">Books · {libraryLabel}</div>
           <input className="input mb-2 max-w-xs" placeholder="Filter by tag…" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} />
           {filteredMaterials.length === 0 ? (
             <div className="surface p-6 text-sm text-ink-muted">No books here yet. Upload a textbook for this class.</div>
@@ -511,10 +683,19 @@ export default function LibraryPage() {
                         <FileText size={16} className="text-brand" />
                         <h3 className="font-semibold">{m.title}</h3>
                         <span className="badge uppercase">{m.type}</span>
+                        {m.official || m.sourceKind === "cdc" ? <span className="badge">Official — CDC</span> : null}
                         
                       </div>
                       <p className="mt-1 text-sm text-ink-muted">
                         {m.sizeLabel} · {formatDate(m.uploadedAt)}
+                        {m.sourceUrl ? (
+                          <>
+                            {" · "}
+                            <a className="text-brand underline" href={m.sourceUrl} target="_blank" rel="noreferrer">
+                              Official source
+                            </a>
+                          </>
+                        ) : null}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -633,7 +814,7 @@ export default function LibraryPage() {
               <Bookmark size={18} /> Bookmarks
             </h3>
             <p className="mt-1 text-xs text-ink-muted">
-              Label + link for this class — chapter path (e.g. /library/chapters/…) or any https URL.
+              Label + link for {libraryLabel} — chapter path (e.g. /library/chapters/…) or any https URL.
             </p>
             <form className="mt-3 space-y-2" onSubmit={saveBookmark}>
               <input className="input" placeholder="Label (e.g. Left off at Ch 5)" value={bmLabel} onChange={(e) => setBmLabel(e.target.value)} required />
@@ -721,12 +902,90 @@ export default function LibraryPage() {
         </aside>
       </div>
 
+      {showCdc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <form
+            className="surface max-h-[90vh] w-full max-w-lg overflow-y-auto p-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void importFromCdc();
+            }}
+          >
+            <h3 className="font-display text-2xl">Import from CDC</h3>
+            <p className="mt-1 text-sm text-ink-muted">
+              Official Curriculum Development Centre (Nepal) textbooks — Grade 1–10, Nepali or English medium. On-demand per subject (not a bulk dump).
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Grade
+              <select
+                className="select mt-1"
+                value={cdcGrade}
+                onChange={(e) => {
+                  const g = Number(e.target.value);
+                  setCdcGrade(g);
+                  const subs = listCdcSubjects(g, cdcMedium);
+                  if (subs[0]) setCdcSubject(subs[0]);
+                }}
+              >
+                {listCdcGrades().map((g) => (
+                  <option key={g} value={g}>
+                    Class {g}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-semibold">
+              Medium
+              <select
+                className="select mt-1"
+                value={cdcMedium}
+                onChange={(e) => {
+                  const m = e.target.value as CdcMedium;
+                  setCdcMedium(m);
+                  const subs = listCdcSubjects(cdcGrade, m);
+                  if (subs[0]) setCdcSubject(subs[0]);
+                }}
+              >
+                <option value="en">English</option>
+                <option value="ne">Nepali</option>
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-semibold">
+              Subject
+              <select className="select mt-1" value={cdcSubject} onChange={(e) => setCdcSubject(e.target.value)}>
+                {cdcSubjects.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="mt-3 text-xs text-ink-muted">
+              Imports into <strong>{libraryLabel}</strong>. If the PDF URL fails (CDC rotates files), we still create Official unit cards and link you to{" "}
+              <a className="text-brand underline" href={CDC_PORTAL} target="_blank" rel="noreferrer">
+                moecdc.gov.np
+              </a>
+              .
+            </p>
+            {cdcMsg && <p className="mt-2 text-sm text-danger">{cdcMsg}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCdc(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" disabled={!!busy || !cdcSubjects.length}>
+                {busy === "cdc" ? "Importing…" : "Import"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {showUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <form className="surface max-h-[90vh] w-full max-w-lg overflow-y-auto p-5" onSubmit={handleUpload}>
             <h3 className="font-display text-2xl">Upload textbook</h3>
             <p className="mt-1 text-sm text-ink-muted">
-              Uploads go into {cls?.name ?? "the selected class"}. Paste TOC text if the PDF has no extractable text.
+              Uploads go into {libraryLabel}. Paste TOC text if the PDF has no extractable text.
             </p>
             <label className="mt-4 flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-bg-elevated px-4 py-6 text-center hover:border-brand">
               <Upload className="text-brand" />

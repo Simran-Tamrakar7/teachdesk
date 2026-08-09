@@ -168,8 +168,31 @@ export function buildRichSlidesFromChapter(
   return pool.slice(0, count).map((s) => ({ ...s, id: uid("s") }));
 }
 
-/** Demo AI image: SVG poster from prompt + theme (no external API). */
-export function generateSlideImageDataUrl(prompt: string, themeId: SlideThemeId): string {
+/** Prefer live image API (Pollinations); fall back to themed SVG poster. */
+export async function generateSlideImageDataUrl(prompt: string, themeId: SlideThemeId): Promise<string> {
+  const lines = prompt.trim() || "Classroom visual";
+  try {
+    const q = encodeURIComponent(`educational classroom illustration, clean textbook style: ${lines}`.slice(0, 200));
+    const url = `https://image.pollinations.ai/prompt/${q}?width=960&height=540&nologo=true`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 1000 && blob.type.startsWith("image/")) {
+        const buf = await blob.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const b64 = btoa(binary);
+        return `data:${blob.type};base64,${b64}`;
+      }
+    }
+  } catch {
+    /* SVG fallback */
+  }
+  return generateSlideImageSvg(prompt, themeId);
+}
+
+export function generateSlideImageSvg(prompt: string, themeId: SlideThemeId): string {
   const t = SLIDE_THEMES[themeId];
   const lines = prompt.trim() || "Classroom visual";
   const safe = lines

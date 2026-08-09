@@ -230,7 +230,7 @@ function PresentationsInner() {
     setAiBusy(true);
     await new Promise((r) => setTimeout(r, 400));
     const prompt = aiPrompt.trim() || currentSlide.imageHint || currentSlide.title;
-    const dataUrl = generateSlideImageDataUrl(prompt, deck.theme);
+    const dataUrl = await generateSlideImageDataUrl(prompt, deck.theme);
     patchSlide({ imageDataUrl: dataUrl, imageHint: prompt });
     setAiBusy(false);
   }

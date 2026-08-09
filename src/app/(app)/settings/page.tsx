@@ -3,8 +3,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/lib/store";
 import { downloadText } from "@/lib/utils";
+import { getAutoBackup, listAutoBackups, maybeAutoBackup, type AutoBackupSlot } from "@/lib/autobackup";
 import { DatabaseBackup, Languages, School, Shield, Type, Volume2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isAdminLike } from "@/lib/rbac";
 
 function ComfortBreakToggle() {
@@ -115,10 +116,35 @@ export default function SettingsPage() {
   const emptyTrash = useAppStore((s) => s.emptyTrash);
   const [passwords, setPasswords] = useState({ current: "", next: "" });
   const [message, setMessage] = useState("");
+  const [autoSlots, setAutoSlots] = useState<AutoBackupSlot[]>([]);
+
+  useEffect(() => {
+    setAutoSlots(listAutoBackups());
+  }, [message]);
 
   function exportBackup() {
     downloadText("teachdesk-backup.json", JSON.stringify(getBackupPayload(), null, 2), "application/json");
     markBackupDone();
+    maybeAutoBackup(getBackupPayload(), true);
+    setAutoSlots(listAutoBackups());
+    setMessage("Manual backup downloaded. Auto-backup slot refreshed.");
+  }
+
+  function restoreAuto(id: string) {
+    const slot = getAutoBackup(id);
+    if (!slot) return;
+    if (!confirm(`Restore auto-backup from ${new Date(slot.at).toLocaleString()}? Current data will merge with the backup.`)) return;
+    setMessage(importBackup(slot.payload) ?? "Auto-backup restored.");
+  }
+
+  function downloadAuto(id: string) {
+    const slot = getAutoBackup(id);
+    if (!slot) return;
+    downloadText(
+      `teachdesk-auto-backup-${slot.at.slice(0, 10)}.json`,
+      JSON.stringify(slot.payload, null, 2),
+      "application/json"
+    );
   }
 
   function speakSample() {
@@ -236,16 +262,66 @@ export default function SettingsPage() {
           <div className="mb-3 flex items-center gap-2 font-semibold">
             <DatabaseBackup size={16} /> Backup
           </div>
-          <p className="text-sm text-ink-muted">Export classes, students, marks, notes, presentations, and holidays as JSON.</p>
+          <p className="text-sm text-ink-muted">
+            Export classes, students, marks, notes, presentations, library, and holidays as JSON. Auto-backups rotate quietly in this browser (last 5).
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="btn btn-primary" onClick={exportBackup}>
               Export all data
             </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                maybeAutoBackup(getBackupPayload(), true);
+                setAutoSlots(listAutoBackups());
+                setMessage("Forced auto-backup saved in this browser.");
+              }}
+            >
+              Save auto-backup now
+            </button>
             <button className="btn btn-secondary" onClick={resetDemo}>
               Reset demo data
             </button>
-            <label className="btn btn-secondary cursor-pointer">Restore backup<input className="hidden" type="file" accept=".json,application/json" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; try { setMessage(importBackup(JSON.parse(await file.text())) ?? "Backup restored."); } catch { setMessage("Invalid backup file."); } }} /></label>
+            <label className="btn btn-secondary cursor-pointer">
+              Restore backup
+              <input
+                className="hidden"
+                type="file"
+                accept=".json,application/json"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    setMessage(importBackup(JSON.parse(await file.text())) ?? "Backup restored.");
+                  } catch {
+                    setMessage("Invalid backup file.");
+                  }
+                }}
+              />
+            </label>
           </div>
+          <div className="mt-4">
+            <h4 className="text-sm font-semibold">Restore from auto-backup</h4>
+            <ul className="mt-2 space-y-2 text-sm">
+              {autoSlots.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-bg-elevated p-3">
+                  <span>{new Date(s.at).toLocaleString()}</span>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-secondary" onClick={() => downloadAuto(s.id)}>
+                      Download
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={() => restoreAuto(s.id)}>
+                      Restore
+                    </button>
+                  </div>
+                </li>
+              ))}
+              {!autoSlots.length && <li className="text-ink-muted">No auto-backups yet — they appear after you use the app for a while.</li>}
+            </ul>
+          </div>
+          <p className="mt-3 text-xs text-ink-muted">
+            Live AI: set <code className="rounded bg-bg-elevated px-1">ANTHROPIC_API_KEY</code> in the server env (see .env.example). Without it, tools fall back to offline stubs.
+          </p>
         </section>
         <section id="trash" className="surface p-5 lg:col-span-2"><h3 className="font-semibold">Trash</h3><ul className="mt-3 space-y-2 text-sm">{trash.map((item) => <li key={item.id} className="flex justify-between rounded-lg bg-bg-elevated p-2"><span>{item.label}</span><button className="btn btn-secondary" onClick={() => restoreTrash(item.id)}>Restore</button></li>)}{!trash.length && <li className="text-ink-muted">Trash is empty.</li>}</ul>{trash.length > 0 && <button className="btn btn-ghost mt-3 text-danger" onClick={emptyTrash}>Empty trash permanently</button>}</section>
         <section className="surface p-5"><h3 className="font-semibold">Audit log</h3><ul className="mt-2 space-y-1 text-xs text-ink-muted">{auditLog.slice(0, 10).map((x) => <li key={x.id}>{x.action}: {x.detail}</li>)}</ul></section>

@@ -1068,6 +1068,7 @@ export const useAppStore = create<AppState>()(
             breakReminders: s.breakReminders,
             recentItems: s.recentItems,
             favorites: s.favorites,
+            libraryBookmarks: s.libraryBookmarks,
             templates: s.templates,
             lastLoginAt: s.lastLoginAt,
             previousLoginAt: s.previousLoginAt,
