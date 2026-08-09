@@ -1,21 +1,37 @@
 import type { AttendanceRecord, Role, SchoolClass, Student, User } from "./types";
+import { isGradeEnabled, sortByGradeOrder } from "./grade-settings";
 
 export function isAdminLike(role?: Role) {
   return role === "admin" || role === "hod";
 }
 
-export function visibleClasses(user: User | null, classes: SchoolClass[]) {
-  const active = classes.filter((c) => !c.deletedAt);
-  if (!user) return [];
-  if (isAdminLike(user.role)) return active;
-  if (user.role === "teacher") {
-    return active.filter((c) => c.teacherId === user.id || user.classIds?.includes(c.id));
+export function visibleClasses(
+  user: User | null,
+  classes: SchoolClass[],
+  opts?: { enabledGrades?: string[]; gradeOrder?: string[] }
+) {
+  let active = classes.filter((c) => !c.deletedAt);
+  if (opts?.enabledGrades?.length) {
+    active = active.filter((c) => isGradeEnabled(c.grade, opts.enabledGrades!));
   }
-  return active;
+  if (!user) return [];
+  if (isAdminLike(user.role)) {
+    return opts?.gradeOrder?.length ? sortByGradeOrder(active, opts.gradeOrder) : active;
+  }
+  if (user.role === "teacher") {
+    active = active.filter((c) => c.teacherId === user.id || user.classIds?.includes(c.id));
+    return opts?.gradeOrder?.length ? sortByGradeOrder(active, opts.gradeOrder) : active;
+  }
+  return [];
 }
 
-export function visibleStudents(user: User | null, students: Student[], classes: SchoolClass[]) {
-  const classIds = new Set(visibleClasses(user, classes).map((c) => c.id));
+export function visibleStudents(
+  user: User | null,
+  students: Student[],
+  classes: SchoolClass[],
+  opts?: { enabledGrades?: string[]; gradeOrder?: string[] }
+) {
+  const classIds = new Set(visibleClasses(user, classes, opts).map((c) => c.id));
   return students.filter((s) => !s.deletedAt && classIds.has(s.classId));
 }
 

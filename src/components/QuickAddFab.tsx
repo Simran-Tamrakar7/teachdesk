@@ -37,6 +37,9 @@ export function QuickAddFab() {
   const addNote = useAppStore((s) => s.addNote);
   const addReminder = useAppStore((s) => s.addReminder);
   const setAttendance = useAppStore((s) => s.setAttendance);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const classScope = useMemo(() => ({ enabledGrades, gradeOrder }), [enabledGrades, gradeOrder]);
 
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"menu" | "note" | "reminder" | "absent" | "voice">("menu");
@@ -46,10 +49,10 @@ export function QuickAddFab() {
   const [listening, setListening] = useState(false);
   const [status, setStatus] = useState("");
 
-  const allowedClasses = useMemo(() => visibleClasses(user, classes), [user, classes]);
+  const allowedClasses = useMemo(() => visibleClasses(user, classes, classScope), [user, classes, classScope]);
   const roster = useMemo(
-    () => visibleStudents(user, students, classes).filter((s) => !classId || s.classId === classId),
-    [user, students, classes, classId]
+    () => visibleStudents(user, students, classes, classScope).filter((s) => !classId || s.classId === classId),
+    [user, students, classes, classId, classScope]
   );
 
   useEffect(() => {

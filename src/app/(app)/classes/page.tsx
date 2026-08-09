@@ -25,8 +25,11 @@ function ClassPulseInner() {
   const favorites = useAppStore((s) => s.favorites);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
   const pushRecent = useAppStore((s) => s.pushRecent);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const classScope = useMemo(() => ({ enabledGrades, gradeOrder }), [enabledGrades, gradeOrder]);
 
-  const allowed = useMemo(() => visibleClasses(user, classes), [user, classes]);
+  const allowed = useMemo(() => visibleClasses(user, classes, classScope), [user, classes, classScope]);
   const [classId, setClassId] = useState(focus || allowed[0]?.id || "");
 
   useEffect(() => {
@@ -34,8 +37,8 @@ function ClassPulseInner() {
   }, [focus]);
 
   const roster = useMemo(
-    () => visibleStudents(user, students, classes).filter((s) => s.classId === classId),
-    [user, students, classes, classId]
+    () => visibleStudents(user, students, classes, classScope).filter((s) => s.classId === classId),
+    [user, students, classes, classId, classScope]
   );
 
   const classAssessments = assessments.filter((a) => a.classId === classId).sort((a, b) => a.date.localeCompare(b.date));

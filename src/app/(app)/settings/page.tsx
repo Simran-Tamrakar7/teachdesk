@@ -7,6 +7,7 @@ import { getAutoBackup, listAutoBackups, maybeAutoBackup, type AutoBackupSlot } 
 import { DatabaseBackup, Languages, School, Shield, Type, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { isAdminLike } from "@/lib/rbac";
+import { ALL_GRADES } from "@/lib/grade-settings";
 
 function ComfortBreakToggle() {
   const breakReminders = useAppStore((s) => s.breakReminders);
@@ -98,6 +99,10 @@ export default function SettingsPage() {
   const timetable = useAppStore((s) => s.timetable);
   const classes = useAppStore((s) => s.classes);
   const subjects = useAppStore((s) => s.subjects);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const toggleGradeEnabled = useAppStore((s) => s.toggleGradeEnabled);
+  const moveEnabledGrade = useAppStore((s) => s.moveEnabledGrade);
   const colorMode = useAppStore((s) => s.colorMode);
   const attendanceThreshold = useAppStore((s) => s.attendanceThreshold);
   const defaultSlideTheme = useAppStore((s) => s.defaultSlideTheme);
@@ -254,6 +259,55 @@ export default function SettingsPage() {
           <label className="mt-3 block text-sm">Attendance alert threshold: {attendanceThreshold}%<input className="mt-1 w-full" type="range" min="50" max="100" value={attendanceThreshold} onChange={(e) => setAttendanceThreshold(Number(e.target.value))} /></label>
           <label className="mt-3 block text-sm">Default slide theme<select className="select mt-1" value={defaultSlideTheme} onChange={(e) => setDefaultSlideTheme(e.target.value as typeof defaultSlideTheme)}>{["forest", "slate", "chalkboard", "ocean", "sand"].map((t) => <option key={t}>{t}</option>)}</select></label>
           <ComfortBreakToggle />
+        </section>
+
+        <section className="surface p-5 lg:col-span-2">
+          <div className="mb-2 flex items-center gap-2 font-semibold">
+            <School size={16} /> Manage Classes
+          </div>
+          <p className="text-sm text-ink-muted">
+            Disabling a class hides it from your daily views — your data isn&apos;t deleted and you can re-enable anytime.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {ALL_GRADES.map((g) => {
+              const on = enabledGrades.includes(g);
+              const orderIdx = gradeOrder.indexOf(g);
+              return (
+                <li key={g} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-bg-elevated px-3 py-2.5">
+                  <label className="flex items-center gap-3 text-sm font-semibold">
+                    <input type="checkbox" checked={on} onChange={() => toggleGradeEnabled(g)} />
+                    Grade {g}
+                    {!on && <span className="text-xs font-normal text-ink-muted">Hidden</span>}
+                  </label>
+                  {on && (
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-xs"
+                        disabled={orderIdx <= 0}
+                        onClick={() => moveEnabledGrade(g, -1)}
+                        title="Move up in selectors"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-xs"
+                        disabled={orderIdx < 0 || orderIdx >= gradeOrder.length - 1}
+                        onClick={() => moveEnabledGrade(g, 1)}
+                        title="Move down in selectors"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-xs text-ink-muted">
+            Enabled order in dropdowns: {gradeOrder.map((g) => `G${g}`).join(" → ") || "—"}. Library Import only lists enabled grades.
+          </p>
         </section>
 
         <TemplatesPanel />

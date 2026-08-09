@@ -22,6 +22,7 @@ function PresentationsInner() {
   const search = useSearchParams();
   const chapters = useAppStore((s) => s.chapters);
   const classes = useAppStore((s) => s.classes);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
   const presentations = useAppStore((s) => s.presentations);
   const upsertPresentation = useAppStore((s) => s.upsertPresentation);
   const removePresentation = useAppStore((s) => s.removePresentation);
@@ -611,7 +612,9 @@ function PresentationsInner() {
                       onChange={(e) => saveDeck({ ...deck, classId: e.target.value || undefined }, false)}
                     >
                       <option value="">—</option>
-                      {classes.filter((c) => !c.deletedAt).map((c) => (
+                      {classes
+                        .filter((c) => !c.deletedAt && (enabledGrades.length === 0 || enabledGrades.includes(String(c.grade))))
+                        .map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>

@@ -24,12 +24,17 @@ export function ComfortOverlays() {
   const dismissMissedAttendance = useAppStore((s) => s.dismissMissedAttendance);
   const lastBackupAt = useAppStore((s) => s.lastBackupAt);
   const backupNudgeDays = useAppStore((s) => s.backupNudgeDays);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
 
   const [breakOpen, setBreakOpen] = useState(false);
   const [backupNudge, setBackupNudge] = useState(false);
   const [sessionStart] = useState(() => Date.now());
 
-  const allowed = useMemo(() => visibleClasses(user, classes), [user, classes]);
+  const allowed = useMemo(
+    () => visibleClasses(user, classes, { enabledGrades, gradeOrder }),
+    [user, classes, enabledGrades, gradeOrder]
+  );
 
   const missed = useMemo(() => {
     if (!user || user.role === "parent" || user.role === "student") return null;

@@ -381,4 +381,6 @@ export type AppSettings = {
   lastBackupAt?: string;
   onboardingDone: boolean;
   breakReminders: boolean;
+  enabledGrades?: string[];
+  gradeOrder?: string[];
 };

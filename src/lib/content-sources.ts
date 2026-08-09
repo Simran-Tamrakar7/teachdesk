@@ -82,68 +82,123 @@ function e(
 
 /**
  * Confirmed CDC subject structure by grade band (not chapter-by-chapter syllabi).
- * Chapter lists stay on-demand from moecdc.gov.np — we only hardcode units when verified.
+ * Source: Nepal CDC / government listings — Grades 1–10. Chapter detail stays on-demand from moecdc.gov.np.
  */
 export const CDC_SUBJECTS_BY_GRADE: Record<number, string[]> = {
+  // Grades 1–3: integrated basic level — Serofero covers science + social learning; arts bundled with health/PE
   1: [
     "Nepali",
     "English",
     "Mathematics",
     "Science (Serofero)",
-    "Health & Physical Education",
-    "Social Studies",
-    "Creative Arts",
+    "Health, Physical and Creative Arts",
+    "Mother tongue / local subject",
   ],
   2: [
     "Nepali",
     "English",
     "Mathematics",
     "Science (Serofero)",
-    "Health & Physical Education",
-    "Social Studies",
-    "Creative Arts",
+    "Health, Physical and Creative Arts",
+    "Mother tongue / local subject",
   ],
   3: [
     "Nepali",
     "English",
     "Mathematics",
     "Science (Serofero)",
-    "Health & Physical Education",
-    "Social Studies",
-    "Creative Arts",
+    "Health, Physical and Creative Arts",
+    "Mother tongue / local subject",
   ],
-  4: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
-  5: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
-  6: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
-  7: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
-  8: ["Nepali", "English", "Mathematics", "Science", "Social Studies", "Health & Physical Education"],
+  // Grades 4–5
+  4: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science and Technology",
+    "Social Studies and Human Value Education",
+    "Health, Physical and Creative Arts",
+  ],
+  5: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science and Technology",
+    "Social Studies and Human Value Education",
+    "Health, Physical and Creative Arts",
+  ],
+  // Grades 6–8
+  6: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science and Technology",
+    "Social Studies",
+    "Health, Physical and Creative Arts",
+    "Computer Science",
+  ],
+  7: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science and Technology",
+    "Social Studies",
+    "Health, Physical and Creative Arts",
+    "Computer Science",
+  ],
+  8: [
+    "Nepali",
+    "English",
+    "Mathematics",
+    "Science and Technology",
+    "Social Studies",
+    "Health, Physical and Creative Arts",
+    "Moral Education",
+    "Computer Science",
+  ],
+  // Grades 9–10: 5 compulsory + electives
   9: [
     "Nepali",
     "English",
     "Mathematics",
-    "Science",
+    "Science and Technology",
     "Social Studies",
+    "Optional Mathematics",
     "Computer Science",
     "Accountancy",
     "Economics",
-    "Optional Math",
+    "History",
   ],
   10: [
     "Nepali",
     "English",
     "Mathematics",
-    "Science",
+    "Science and Technology",
     "Social Studies",
+    "Optional Mathematics",
     "Computer Science",
     "Accountancy",
     "Economics",
-    "Optional Math",
     "History",
   ],
 };
 
-/** Verified unit titles only — Grade 8 Science Part I TOC (textbook). Do not invent other grades. */
+/** Verified unit titles only — Grade 8 Science & Technology Part I TOC (textbook). Do not invent other grades. */
 export const VERIFIED_CDC_UNITS: Record<string, string[]> = {
+  "8|Science and Technology|en": [
+    "Scientific Learning",
+    "Information and Communication Technology",
+    "Living Beings and Their Structure",
+    "Biodiversity and Environment",
+    "Life Process",
+    "Force and Motion",
+    "Energy in Daily Life",
+    "Electricity and Magnetism",
+    "Matter",
+    "Materials Used in Daily Life",
+    "The Earth and Universe",
+  ],
+  // alias for older catalog keys
   "8|Science|en": [
     "Scientific Learning",
     "Information and Communication Technology",

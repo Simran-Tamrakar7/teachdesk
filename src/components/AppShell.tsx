@@ -66,6 +66,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const notes = useAppStore((s) => s.notes);
   const reminders = useAppStore((s) => s.reminders);
   const classes = useAppStore((s) => s.classes);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
   const timetable = useAppStore((s) => s.timetable);
   const [mobileNav, setMobileNav] = useState(false);
   const [q, setQ] = useState("");
@@ -108,12 +110,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const startMyDayHref = useMemo(() => {
     const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
-    const allowed = visibleClasses(user, classes);
+    const allowed = visibleClasses(user, classes, { enabledGrades, gradeOrder });
     const first = timetable.find((t) => t.day === todayName && allowed.some((c) => c.id === t.classId));
     const classId = first?.classId ?? allowed[0]?.id ?? "";
     const date = new Date().toISOString().slice(0, 10);
     return `/attendance?start=1&classId=${classId}&date=${date}`;
-  }, [user, classes, timetable]);
+  }, [user, classes, timetable, enabledGrades, gradeOrder]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

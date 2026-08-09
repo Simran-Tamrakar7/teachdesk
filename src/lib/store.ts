@@ -22,6 +22,7 @@ import {
   TIMETABLE,
 } from "./seed";
 import { calcAttendancePct, initials } from "./rbac";
+import { deriveEnabledGradesFromClasses, moveGradeInOrder } from "./grade-settings";
 import type {
   AiLogEntry,
   Announcement,
@@ -83,6 +84,10 @@ const DEFAULT_SETTINGS = {
   lastBackupAt: undefined as string | undefined,
   onboardingDone: false,
   breakReminders: true,
+  /** Grades 1–10 toggles — disabled grades stay in storage but hide from daily views */
+  enabledGrades: ["6", "8", "9"] as string[],
+  /** Display order for enabled grades in selectors */
+  gradeOrder: ["8", "6", "9"] as string[],
 };
 
 export const DEFAULT_TEMPLATES = [
@@ -207,6 +212,8 @@ type AppState = {
   lastBackupAt?: string;
   onboardingDone: boolean;
   breakReminders: boolean;
+  enabledGrades: string[];
+  gradeOrder: string[];
   recentItems: RecentItem[];
   favorites: FavoriteItem[];
   libraryBookmarks: LibraryBookmark[];
@@ -315,6 +322,10 @@ type AppState = {
   setNotifyCalendar: (v: boolean) => void;
   setOnboardingDone: (v: boolean) => void;
   setBreakReminders: (v: boolean) => void;
+  setEnabledGrades: (grades: string[]) => void;
+  toggleGradeEnabled: (grade: string) => void;
+  setGradeOrder: (order: string[]) => void;
+  moveEnabledGrade: (grade: string, dir: -1 | 1) => void;
   pushRecent: (item: Omit<RecentItem, "at">) => void;
   toggleFavorite: (item: FavoriteItem) => void;
   addLibraryBookmark: (b: Omit<LibraryBookmark, "id" | "createdAt">) => void;
@@ -981,6 +992,31 @@ export const useAppStore = create<AppState>()(
         setNotifyCalendar: (v) => set({ notifyCalendar: v }),
         setOnboardingDone: (v) => set({ onboardingDone: v }),
         setBreakReminders: (v) => set({ breakReminders: v }),
+        setEnabledGrades: (grades) => {
+          const unique = [...new Set(grades.map(String))].filter((g) => Number(g) >= 1 && Number(g) <= 10);
+          const order = get().gradeOrder.filter((g) => unique.includes(g));
+          const missing = unique.filter((g) => !order.includes(g));
+          set({ enabledGrades: unique, gradeOrder: [...order, ...missing] });
+        },
+        toggleGradeEnabled: (grade) => {
+          const g = String(grade);
+          const cur = get().enabledGrades;
+          if (cur.includes(g)) {
+            set({
+              enabledGrades: cur.filter((x) => x !== g),
+              gradeOrder: get().gradeOrder.filter((x) => x !== g),
+            });
+          } else {
+            set({
+              enabledGrades: [...cur, g].sort((a, b) => Number(a) - Number(b)),
+              gradeOrder: [...get().gradeOrder, g],
+            });
+          }
+        },
+        setGradeOrder: (order) => set({ gradeOrder: order.map(String) }),
+        moveEnabledGrade: (grade, dir) => {
+          set({ gradeOrder: moveGradeInOrder(get().gradeOrder, String(grade), dir) });
+        },
         pushRecent: (item) => {
           const next = [{ ...item, at: nowIso() }, ...get().recentItems.filter((r) => r.href !== item.href)].slice(0, 5);
           set({ recentItems: next });
@@ -1070,6 +1106,8 @@ export const useAppStore = create<AppState>()(
             lastBackupAt: s.lastBackupAt,
             onboardingDone: s.onboardingDone,
             breakReminders: s.breakReminders,
+            enabledGrades: s.enabledGrades,
+            gradeOrder: s.gradeOrder,
             recentItems: s.recentItems,
             favorites: s.favorites,
             libraryBookmarks: s.libraryBookmarks,
@@ -1137,6 +1175,9 @@ export const useAppStore = create<AppState>()(
             "backupNudgeDays",
             "lastBackupAt",
             "onboardingDone",
+            "breakReminders",
+            "enabledGrades",
+            "gradeOrder",
           ] as const;
 
           for (const key of settingsKeys) {
@@ -1208,6 +1249,8 @@ export const useAppStore = create<AppState>()(
         lastBackupAt: s.lastBackupAt,
         onboardingDone: s.onboardingDone,
         breakReminders: s.breakReminders,
+        enabledGrades: s.enabledGrades,
+        gradeOrder: s.gradeOrder,
         recentItems: s.recentItems,
         favorites: s.favorites,
         libraryBookmarks: s.libraryBookmarks,
@@ -1231,11 +1274,25 @@ export const useAppStore = create<AppState>()(
           }
         }
         if (!users.length) users = DEMO_USERS.map((u) => ({ ...u }));
+        const classes = Array.isArray(p.classes) && p.classes.length ? p.classes : current.classes;
+        const enabledGrades =
+          Array.isArray(p.enabledGrades) && p.enabledGrades.length
+            ? p.enabledGrades.map(String)
+            : deriveEnabledGradesFromClasses(classes);
+        const gradeOrder =
+          Array.isArray(p.gradeOrder) && p.gradeOrder.length
+            ? p.gradeOrder.map(String).filter((g) => enabledGrades.includes(g))
+            : [...enabledGrades];
+        for (const g of enabledGrades) {
+          if (!gradeOrder.includes(g)) gradeOrder.push(g);
+        }
         return {
           ...current,
           ...p,
           users,
-          classes: Array.isArray(p.classes) && p.classes.length ? p.classes : current.classes,
+          classes,
+          enabledGrades,
+          gradeOrder,
           chapters: Array.isArray(p.chapters) && p.chapters.length ? p.chapters : current.chapters,
           libraryBookmarks: Array.isArray(p.libraryBookmarks)
             ? p.libraryBookmarks.filter((b: { classId?: string; label?: string; link?: string }) => b?.classId && b?.label && b?.link)

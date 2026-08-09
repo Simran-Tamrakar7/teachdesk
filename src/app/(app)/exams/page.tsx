@@ -60,11 +60,14 @@ function ExamsInner() {
   const duplicateAssessment = useAppStore((s) => s.duplicateAssessment);
   const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
   const pushAiLog = useAppStore((s) => s.pushAiLog);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const classScope = useMemo(() => ({ enabledGrades, gradeOrder }), [enabledGrades, gradeOrder]);
 
-  const allowedClasses = useMemo(() => visibleClasses(user, classes), [user, classes]);
+  const allowedClasses = useMemo(() => visibleClasses(user, classes, classScope), [user, classes, classScope]);
   const allowedStudents = useMemo(
-    () => visibleStudents(user, students, classes),
-    [user, students, classes]
+    () => visibleStudents(user, students, classes, classScope),
+    [user, students, classes, classScope]
   );
 
   const [tab, setTab] = useState<Tab>("exams");

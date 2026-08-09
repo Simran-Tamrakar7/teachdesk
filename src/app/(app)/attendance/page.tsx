@@ -16,10 +16,13 @@ function AttendanceInner() {
   const setAttendance = useAppStore((s) => s.setAttendance);
   const user = useAppStore((s) => s.user);
   const schoolName = useAppStore((s) => s.schoolName);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
   const threshold = useAppStore((s) => s.attendanceThreshold);
   const timetable = useAppStore((s) => s.timetable);
 
-  const allowedClasses = visibleClasses(user, classes);
+  const classScope = { enabledGrades, gradeOrder };
+  const allowedClasses = visibleClasses(user, classes, classScope);
   const [classId, setClassId] = useState(allowedClasses[0]?.id ?? "c1");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [period, setPeriod] = useState(1);
@@ -48,7 +51,7 @@ function AttendanceInner() {
 
   const roster = useMemo(
     () =>
-      visibleStudents(user, students, classes)
+      visibleStudents(user, students, classes, classScope)
         .filter((s) => s.classId === classId)
         .sort((a, b) => a.rollNumber.localeCompare(b.rollNumber)),
     [students, classId, user, classes]

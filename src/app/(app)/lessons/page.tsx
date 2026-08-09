@@ -21,6 +21,13 @@ export default function LessonsPage() {
   const lessonPlans = useAppStore((s) => s.lessonPlans);
   const chapters = useAppStore((s) => s.chapters);
   const classes = useAppStore((s) => s.classes);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const visibleClassList = useMemo(() => {
+    const active = classes.filter((c) => !c.deletedAt && enabledGrades.includes(String(c.grade)));
+    const order = new Map(gradeOrder.map((g, i) => [g, i]));
+    return [...active].sort((a, b) => (order.get(a.grade) ?? 99) - (order.get(b.grade) ?? 99) || Number(a.grade) - Number(b.grade));
+  }, [classes, enabledGrades, gradeOrder]);
   const timetable = useAppStore((s) => s.timetable);
   const holidays = useAppStore((s) => s.holidays);
   const addLessonPlan = useAppStore((s) => s.addLessonPlan);
@@ -36,7 +43,7 @@ export default function LessonsPage() {
   const [selectedId, setSelectedId] = useState(lessonPlans.find((l) => !l.template)?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [genChapterId, setGenChapterId] = useState(chapters[0]?.id ?? "ch1");
-  const [genClassId, setGenClassId] = useState(classes[0]?.id ?? "c1");
+  const [genClassId, setGenClassId] = useState(visibleClassList[0]?.id ?? classes[0]?.id ?? "c1");
   const [genDate, setGenDate] = useState("2026-08-13");
   const [view, setView] = useState<"week" | "month" | "holidays">("week");
   const [editingHoliday, setEditingHoliday] = useState<string | null>(null);
@@ -138,7 +145,7 @@ export default function LessonsPage() {
         <label className="text-sm font-semibold">
           Class
           <select className="select mt-1" value={genClassId} onChange={(e) => setGenClassId(e.target.value)}>
-            {classes.map((c) => (
+            {visibleClassList.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

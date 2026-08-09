@@ -72,6 +72,8 @@ export default function LibraryPage() {
   const materials = useAppStore((s) => s.materials);
   const chapters = useAppStore((s) => s.chapters);
   const classes = useAppStore((s) => s.classes);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
   const libraryBookmarks = useAppStore((s) => s.libraryBookmarks);
   const addMaterial = useAppStore((s) => s.addMaterial);
   const updateMaterial = useAppStore((s) => s.updateMaterial);
@@ -87,7 +89,11 @@ export default function LibraryPage() {
   const removeLibraryBookmark = useAppStore((s) => s.removeLibraryBookmark);
   const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
 
-  const activeClasses = useMemo(() => classes.filter((c) => !c.deletedAt), [classes]);
+  const activeClasses = useMemo(
+    () =>
+      classes.filter((c) => !c.deletedAt && (enabledGrades.length === 0 || enabledGrades.includes(String(c.grade)))),
+    [classes, enabledGrades]
+  );
 
   const libraryGroups = useMemo(() => {
     const map = new Map<string, { key: string; grade: string; subject: string; classIds: string[]; primaryId: string }>();
@@ -97,10 +103,20 @@ export default function LibraryPage() {
       if (cur) cur.classIds.push(c.id);
       else map.set(key, { key, grade: c.grade, subject: c.subject, classIds: [c.id], primaryId: c.id });
     }
-    return [...map.values()].sort((a, b) => Number(a.grade) - Number(b.grade) || a.subject.localeCompare(b.subject));
-  }, [activeClasses]);
+    const order = new Map(gradeOrder.map((g, i) => [g, i]));
+    return [...map.values()].sort(
+      (a, b) =>
+        (order.get(a.grade) ?? 99) - (order.get(b.grade) ?? 99) ||
+        Number(a.grade) - Number(b.grade) ||
+        a.subject.localeCompare(b.subject)
+    );
+  }, [activeClasses, gradeOrder]);
 
-  const gradesInRail = useMemo(() => [...new Set(libraryGroups.map((g) => g.grade))].sort((a, b) => Number(a) - Number(b)), [libraryGroups]);
+  const gradesInRail = useMemo(() => {
+    const grades = [...new Set(libraryGroups.map((g) => g.grade))];
+    const order = new Map(gradeOrder.map((g, i) => [g, i]));
+    return grades.sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99) || Number(a) - Number(b));
+  }, [libraryGroups, gradeOrder]);
 
   const defaultKey =
     libraryGroups.find((g) => g.grade === "8" && /science/i.test(g.subject))?.key ?? libraryGroups[0]?.key ?? "";
@@ -1415,7 +1431,9 @@ export default function LibraryPage() {
                   if (subs[0]) setImpSubject(subs[0]);
                 }}
               >
-                {listContentGrades(impSource).map((g) => (
+                {listContentGrades(impSource)
+                  .filter((g) => enabledGrades.length === 0 || enabledGrades.includes(String(g)))
+                  .map((g) => (
                   <option key={g} value={g}>
                     Class {g}
                   </option>

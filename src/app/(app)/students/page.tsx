@@ -25,9 +25,12 @@ export default function StudentsPage() {
   const promoteClassToNextGrade = useAppStore((s) => s.promoteClassToNextGrade);
   const bulkAssignSubject = useAppStore((s) => s.bulkAssignSubject);
   const bulkSoftDeleteStudents = useAppStore((s) => s.bulkSoftDeleteStudents);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const classScope = useMemo(() => ({ enabledGrades, gradeOrder }), [enabledGrades, gradeOrder]);
 
-  const classes = useMemo(() => visibleClasses(user, allClasses), [user, allClasses]);
-  const students = useMemo(() => visibleStudents(user, allStudents, allClasses), [user, allStudents, allClasses]);
+  const classes = useMemo(() => visibleClasses(user, allClasses, classScope), [user, allClasses, classScope]);
+  const students = useMemo(() => visibleStudents(user, allStudents, allClasses, classScope), [user, allStudents, allClasses, classScope]);
 
   const [tab, setTab] = useState<"roster" | "import" | "setup">("roster");
   const [classId, setClassId] = useState(classes[0]?.id ?? "c1");

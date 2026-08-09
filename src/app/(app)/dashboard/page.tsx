@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -48,6 +49,10 @@ export default function DashboardPage() {
   const favorites = useAppStore((s) => s.favorites);
   const previousLoginAt = useAppStore((s) => s.previousLoginAt);
   const auditLog = useAppStore((s) => s.auditLog);
+  const enabledGrades = useAppStore((s) => s.enabledGrades);
+  const gradeOrder = useAppStore((s) => s.gradeOrder);
+  const classScope = useMemo(() => ({ enabledGrades, gradeOrder }), [enabledGrades, gradeOrder]);
+  const visible = visibleStudents(user, students, classes, classScope);
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
     new Date().getDay()
@@ -58,7 +63,6 @@ export default function DashboardPage() {
   );
   const upcoming = [...assignments].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 3);
   const openReminders = reminders.filter((r) => !r.done);
-  const visible = visibleStudents(user, students, classes);
   const flagged = visible.filter((s) => calcAttendancePct(s.id, attendance) < attendanceThreshold);
   const alerts = buildSmartAlerts({ students: visible, attendance, threshold: attendanceThreshold, grades, assessments, holidays, pendingSubmissions: pendingGrading.length, classNames: Object.fromEntries(classes.map((c) => [c.id, c.name])) });
   const briefing = buildDailyBriefing({ teacherName: user?.name ?? "Teacher", todayName, todaysClasses, classNames: Object.fromEntries(classes.map((c) => [c.id, c.name])), openReminders, lowAttendance: flagged.map((s) => ({ name: s.name, pct: calcAttendancePct(s.id, attendance) })), pendingSubmissions: pendingGrading.length, holidaysSoon: holidays.slice(0, 2) });
@@ -166,7 +170,7 @@ export default function DashboardPage() {
           <h2 className="font-display text-xl">End-of-week recap</h2>
           <p className="mt-2 text-sm text-ink-muted">
             {weeklyDigest({
-              classCount: visibleClasses(user, classes).length,
+              classCount: visibleClasses(user, classes, classScope).length,
               studentCount: visible.length,
               avgAttendance: Math.round(average(visible.map((s) => calcAttendancePct(s.id, attendance))) || 100),
               avgQuiz: Math.round(classAvg) || 0,
