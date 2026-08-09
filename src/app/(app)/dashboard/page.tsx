@@ -3,6 +3,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useAppStore } from "@/lib/store";
 import { average, formatDate } from "@/lib/utils";
+import { buildAiTodos, buildDailyBriefing, buildSmartAlerts, factOfTheDay, activityOfTheDay, forecastGrade, generateParentUpdate, weeklyDigest } from "@/lib/dashboard-ai";
+import { calcAttendancePct, visibleClasses, visibleStudents } from "@/lib/rbac";
+import { generateLessonPlan, generateQuizFromChapter } from "@/lib/ai";
 import {
   AlertCircle,
   BookMarked,
@@ -31,16 +34,38 @@ export default function DashboardPage() {
   const assessments = useAppStore((s) => s.assessments);
   const attendance = useAppStore((s) => s.attendance);
   const holidays = useAppStore((s) => s.holidays);
-  const messages = useAppStore((s) => s.messages);
+  const reminders = useAppStore((s) => s.reminders);
   const classes = useAppStore((s) => s.classes);
+  const students = useAppStore((s) => s.students);
+  const chapters = useAppStore((s) => s.chapters);
+  const addLessonPlan = useAppStore((s) => s.addLessonPlan);
+  const addAssessment = useAppStore((s) => s.addAssessment);
+  const addNote = useAppStore((s) => s.addNote);
+  const aiLog = useAppStore((s) => s.aiLog);
+  const pushAiLog = useAppStore((s) => s.pushAiLog);
+  const attendanceThreshold = useAppStore((s) => s.attendanceThreshold);
+  const recentItems = useAppStore((s) => s.recentItems);
+  const favorites = useAppStore((s) => s.favorites);
+  const previousLoginAt = useAppStore((s) => s.previousLoginAt);
+  const auditLog = useAppStore((s) => s.auditLog);
 
-  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+    new Date().getDay()
+  ];
   const todaysClasses = timetable.filter((t) => t.day === todayName);
   const pendingGrading = assignments.filter((a) =>
     a.submissions.some((s) => s.status === "submitted")
   );
   const upcoming = [...assignments].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 3);
-  const unread = messages.filter((m) => !m.read && m.to === user?.email);
+  const openReminders = reminders.filter((r) => !r.done);
+  const visible = visibleStudents(user, students, classes);
+  const flagged = visible.filter((s) => calcAttendancePct(s.id, attendance) < attendanceThreshold);
+  const alerts = buildSmartAlerts({ students: visible, attendance, threshold: attendanceThreshold, grades, assessments, holidays, pendingSubmissions: pendingGrading.length, classNames: Object.fromEntries(classes.map((c) => [c.id, c.name])) });
+  const briefing = buildDailyBriefing({ teacherName: user?.name ?? "Teacher", todayName, todaysClasses, classNames: Object.fromEntries(classes.map((c) => [c.id, c.name])), openReminders, lowAttendance: flagged.map((s) => ({ name: s.name, pct: calcAttendancePct(s.id, attendance) })), pendingSubmissions: pendingGrading.length, holidaysSoon: holidays.slice(0, 2) });
+  const todos = buildAiTodos({ openReminders, alerts, todaysClasses, pendingSubmissions: pendingGrading.length });
+  async function tomorrowLesson() { const chapter = chapters[0]; if (!chapter) return; const plan = await generateLessonPlan(chapter); addLessonPlan({ id: `lp-${Date.now()}`, classId: chapter.classId, chapterId: chapter.id, date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), durationMins: 45, ...plan }); pushAiLog({ kind: "lesson", title: plan.title, preview: "Generated from dashboard" }); }
+  async function quickQuiz() { const chapter = chapters[0]; if (!chapter) return; const questions = await generateQuizFromChapter(chapter); addAssessment({ id: `a-${Date.now()}`, title: `Quick quiz: ${chapter.title}`, classId: chapter.classId, subject: classes.find((c) => c.id === chapter.classId)?.subject ?? "Science", chapterId: chapter.id, chapterIds: [chapter.id], type: "quiz", maxMarks: questions.reduce((n, q) => n + q.marks, 0), date: new Date().toISOString().slice(0, 10), term: "Term 1", questions: questions.map((q, i) => ({ ...q, id: `q-${i}` })) }); pushAiLog({ kind: "quiz", title: chapter.title, preview: "Generated quick quiz" }); }
+  function parentDraft() { const student = flagged[0]; if (!student) return; addNote({ title: `Parent update: ${student.name}`, body: generateParentUpdate(student.name, calcAttendancePct(student.id, attendance)), studentId: student.id, classId: student.classId, pinned: false }); pushAiLog({ kind: "parent", title: student.name, preview: "Saved parent update draft" }); }
 
   const quiz = assessments.find((a) => a.id === "a1");
   const quizGrades = grades.filter((g) => g.assessmentId === "a1");
@@ -63,12 +88,90 @@ export default function DashboardPage() {
     { topic: "Equation balancing", missRate: 22 },
   ];
 
+  const isFriday = todayName === "Friday";
+  const sinceLogin = previousLoginAt
+    ? auditLog.filter((a) => a.at > previousLoginAt).slice(0, 5)
+    : [];
+  const quote = factOfTheDay(chapters[0]?.title);
+
   return (
     <div>
       <PageHeader
-        title={`Good day, ${user?.name.split(" ")[0]}`}
-        subtitle="Here’s what needs your attention today — classes, grading, and upcoming deadlines."
+        title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${user?.name.split(" ")[0]}`}
+        subtitle={`${quote} · ${activityOfTheDay(user?.subject)}`}
+        actions={
+          <Link className="btn btn-primary" href="/attendance?start=1">
+            Start my day
+          </Link>
+        }
       />
+
+      {sinceLogin.length > 0 && (
+        <section className="surface mb-4 p-4">
+          <h2 className="font-semibold">Since you last logged in</h2>
+          <ul className="mt-2 space-y-1 text-sm text-ink-muted">
+            {sinceLogin.map((a) => (
+              <li key={a.id}>
+                {a.action}: {a.detail}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(recentItems.length > 0 || favorites.length > 0) && (
+        <div className="mb-4 grid gap-4 md:grid-cols-2">
+          <section className="surface p-4">
+            <h2 className="font-semibold">Jump back in</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {recentItems.map((r) => (
+                <li key={r.href}>
+                  <Link className="text-brand hover:underline" href={r.href}>
+                    {r.label}
+                  </Link>
+                  <span className="ml-2 text-xs text-ink-muted">{r.kind}</span>
+                </li>
+              ))}
+              {!recentItems.length && <li className="text-ink-muted">Open a student, chapter, or class to build this list.</li>}
+            </ul>
+          </section>
+          <section className="surface p-4">
+            <h2 className="font-semibold">Pinned this week</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {favorites.map((f) => (
+                <li key={`${f.kind}-${f.id}`}>
+                  <Link className="text-brand hover:underline" href={f.href}>
+                    {f.label}
+                  </Link>
+                </li>
+              ))}
+              {!favorites.length && (
+                <li className="text-ink-muted">
+                  Pin a class from <Link href="/classes" className="text-brand">Class pulse</Link>.
+                </li>
+              )}
+            </ul>
+          </section>
+        </div>
+      )}
+
+      {isFriday && (
+        <section className="surface mb-4 border border-brand/20 bg-brand-soft/40 p-4">
+          <h2 className="font-display text-xl">End-of-week recap</h2>
+          <p className="mt-2 text-sm text-ink-muted">
+            {weeklyDigest({
+              classCount: visibleClasses(user, classes).length,
+              studentCount: visible.length,
+              avgAttendance: Math.round(average(visible.map((s) => calcAttendancePct(s.id, attendance))) || 100),
+              avgQuiz: Math.round(classAvg) || 0,
+              lowAttendanceCount: flagged.length,
+            })}
+          </p>
+          <p className="mt-2 text-sm">
+            Pending grading items: {pendingGrading.length}. Open reminders: {openReminders.filter((r) => !r.done).length}.
+          </p>
+        </section>
+      )}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -85,9 +188,9 @@ export default function DashboardPage() {
             icon: ClipboardCheck,
           },
           {
-            label: "Unread messages",
-            value: String(unread.length),
-            hint: "Parent / school inbox",
+            label: "Open reminders",
+            value: String(openReminders.length),
+            hint: "Due tasks on Notes",
             icon: AlertCircle,
           },
           {
@@ -110,6 +213,7 @@ export default function DashboardPage() {
           );
         })}
       </div>
+      <section className="surface mb-4 p-5"><h2 className="font-display text-xl">AI briefing</h2><p className="mt-2 text-sm text-ink-muted">{briefing}</p><div className="mt-4 flex flex-wrap gap-2"><button className="btn btn-primary" onClick={tomorrowLesson}>Generate tomorrow&apos;s lesson</button><button className="btn btn-secondary" onClick={quickQuiz}>Quick quiz</button><button className="btn btn-secondary" disabled={!flagged.length} onClick={parentDraft}>Draft parent update</button></div><div className="mt-4 grid gap-3 md:grid-cols-2"><div><h3 className="font-semibold">Smart alerts</h3>{alerts.slice(0, 4).map((a) => <p key={a.id} className="mt-1 text-sm">{a.title}</p>)}</div><div><h3 className="font-semibold">AI to-dos</h3>{todos.slice(0, 4).map((t) => <p key={t.id} className="mt-1 text-sm">{t.label}</p>)}</div></div></section>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="surface p-5">
@@ -135,7 +239,7 @@ export default function DashboardPage() {
                         {slot.time} · {slot.room}
                       </div>
                     </div>
-                    <Link href="/students" className="btn btn-secondary">
+                    <Link href="/attendance" className="btn btn-secondary">
                       Attendance
                     </Link>
                   </li>

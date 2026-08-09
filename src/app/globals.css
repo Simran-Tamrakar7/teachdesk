@@ -21,6 +21,26 @@
   --sidebar-muted: #9cbcb5;
 }
 
+html.dark {
+  --bg: #101918;
+  --bg-elevated: #172321;
+  --surface: #1c2b29;
+  --ink: #e7f3f0;
+  --ink-muted: #a5bbb6;
+  --brand: #55b8a5;
+  --brand-deep: #8dd4c5;
+  --brand-soft: #203f39;
+  --accent: #e3a94b;
+  --accent-soft: #3e3320;
+  --danger: #ff8d83;
+  --danger-soft: #422525;
+  --line: #314542;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  --sidebar: #0c1413;
+  --sidebar-ink: #e7f3f0;
+  --sidebar-muted: #9bb4ae;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-elevated: var(--bg-elevated);
@@ -135,7 +155,7 @@ body {
 .textarea {
   width: 100%;
   border: 1px solid var(--line);
-  background: white;
+  background: var(--surface);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   font: inherit;

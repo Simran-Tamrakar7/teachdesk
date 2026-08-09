@@ -7,11 +7,11 @@ import { Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
 const SUGGESTIONS = [
+  "What else can you help with?",
   "Generate a quiz on photosynthesis",
+  "Make a PowerPoint outline for stomata",
   "Draft a parent email about homework",
-  "Rewrite this at Grade 6 reading level: Plants convert light into chemical energy via chlorophyll.",
   "How do I teach stomata?",
-  "Create a rubric for short answers",
 ];
 
 export function AiPanel({ open, onClose }: { open: boolean; onClose: () => void }) {

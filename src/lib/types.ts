@@ -4,9 +4,19 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  username: string;
+  password: string;
   role: Role;
   subject?: string;
   avatarInitials: string;
+  classIds?: string[];
+  defaultSlideTheme?: SlideThemeId;
+};
+
+export type Subject = {
+  id: string;
+  name: string;
+  code?: string;
 };
 
 export type SchoolClass = {
@@ -17,6 +27,19 @@ export type SchoolClass = {
   subject: string;
   teacherId: string;
   schedule: string;
+  deletedAt?: string | null;
+};
+
+export type ContentLang = "en" | "ne";
+
+export type ChapterLocale = {
+  title: string;
+  summary: string;
+  keyTerms: string[];
+  objectives: string[];
+  discussionQuestions: string[];
+  body?: string;
+  pointers?: string[];
 };
 
 export type Chapter = {
@@ -29,8 +52,28 @@ export type Chapter = {
   keyTerms: string[];
   objectives: string[];
   discussionQuestions: string[];
+  /** Full chapter text extracted / pasted from the book */
+  body?: string;
+  /** Source language of the primary fields above */
+  lang?: ContentLang;
+  /** Nepali (or other) translation / alternate book edition */
+  ne?: ChapterLocale;
+  pointers?: string[];
+  slideOutline?: { title: string; bullets: string[]; imageHint?: string }[];
   pageStart?: number;
   pageEnd?: number;
+  deletedAt?: string | null;
+  collection?: string;
+  materialId?: string;
+  sourceBook?: string;
+  wordCount?: number;
+  /** Cached “Understand this chapter” AI outputs */
+  aiCache?: {
+    summarize?: string;
+    explain?: string;
+    pointers?: string;
+    glossary?: string;
+  };
 };
 
 export type MaterialVersion = {
@@ -53,6 +96,14 @@ export type Material = {
   sizeLabel: string;
   versions: MaterialVersion[];
   contentPreview: string;
+  /** Full extracted / pasted text used for chapter split */
+  extractedText?: string;
+  /** Lets teachers open/download the uploaded file */
+  dataUrl?: string;
+  mime?: string;
+  lang?: ContentLang;
+  deletedAt?: string | null;
+  collection?: string;
 };
 
 export type LessonPlan = {
@@ -76,6 +127,7 @@ export type Student = {
   section: string;
   parentEmail?: string;
   attendancePct: number;
+  deletedAt?: string | null;
 };
 
 export type AttendanceRecord = {
@@ -87,15 +139,30 @@ export type AttendanceRecord = {
   status: "present" | "absent" | "late" | "excused";
 };
 
+export type ExamFile = {
+  fileName: string;
+  mime: string;
+  sizeLabel: string;
+  dataUrl?: string;
+};
+
 export type Assessment = {
   id: string;
   title: string;
   classId: string;
+  subject: string;
   chapterId?: string;
-  type: "quiz" | "test" | "worksheet";
+  chapterIds?: string[];
+  type: "quiz" | "test" | "worksheet" | "exam";
   maxMarks: number;
+  passMark?: number;
   date: string;
+  term?: string;
   questions: Question[];
+  paper?: ExamFile;
+  answerKey?: ExamFile;
+  reusedFromId?: string;
+  aiRubric?: string;
 };
 
 export type Question = {
@@ -114,6 +181,7 @@ export type GradeEntry = {
   marks: number;
   feedback?: string;
   aiSuggested?: number;
+  markedScript?: ExamFile;
 };
 
 export type Assignment = {
@@ -133,16 +201,6 @@ export type Announcement = {
   classId?: string;
   createdAt: string;
   authorId: string;
-};
-
-export type Message = {
-  id: string;
-  to: string;
-  from: string;
-  subject: string;
-  body: string;
-  createdAt: string;
-  read: boolean;
 };
 
 export type ResearchItem = {
@@ -170,7 +228,9 @@ export type Holiday = {
   id: string;
   title: string;
   date: string;
-  type: "holiday" | "exam" | "term";
+  type: "holiday" | "exam" | "term" | "field_trip" | "event";
+  notes?: string;
+  recurring?: boolean;
 };
 
 export type ChatMessage = {
@@ -178,4 +238,125 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: string[];
+};
+
+export type TeacherNote = {
+  id: string;
+  title: string;
+  body: string;
+  classId?: string;
+  studentId?: string;
+  chapterId?: string;
+  dueAt?: string;
+  pinned: boolean;
+  done?: boolean;
+  snoozedUntil?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
+
+export type ReminderRecurrence = "none" | "daily" | "weekly" | "friday";
+
+export type Reminder = {
+  id: string;
+  title: string;
+  dueAt: string;
+  done: boolean;
+  classId?: string;
+  studentId?: string;
+  chapterId?: string;
+  recurrence: ReminderRecurrence;
+  snoozedUntil?: string | null;
+  createdAt: string;
+  deletedAt?: string | null;
+};
+
+export type SlideThemeId = "forest" | "slate" | "chalkboard" | "ocean" | "sand";
+
+export type PresentationSlide = {
+  id: string;
+  title: string;
+  bullets: string[];
+  notes?: string;
+  imageHint?: string;
+  imageDataUrl?: string;
+};
+
+export type Presentation = {
+  id: string;
+  title: string;
+  chapterId?: string;
+  classId?: string;
+  theme: SlideThemeId;
+  slides: PresentationSlide[];
+  updatedAt: string;
+};
+
+export type TrashItem = {
+  id: string;
+  kind: "student" | "class" | "note" | "reminder" | "chapter" | "material";
+  label: string;
+  payload: unknown;
+  deletedAt: string;
+  expiresAt: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  at: string;
+  userId: string;
+  userName: string;
+  action: string;
+  detail: string;
+};
+
+export type AiLogEntry = {
+  id: string;
+  at: string;
+  kind: "quiz" | "lesson" | "summary" | "presentation" | "parent" | "briefing" | "rubric" | "auto-grade" | "other";
+  title: string;
+  preview: string;
+};
+
+export type RecentItem = {
+  id: string;
+  kind: "student" | "chapter" | "presentation" | "class" | "note" | "assessment";
+  label: string;
+  href: string;
+  at: string;
+};
+
+export type FavoriteItem = {
+  id: string;
+  kind: "student" | "chapter" | "class" | "presentation";
+  label: string;
+  href: string;
+};
+
+export type SavedTemplate = {
+  id: string;
+  kind: "lesson" | "comment" | "worksheet";
+  title: string;
+  body: string;
+};
+
+export type AppSettings = {
+  schoolName: string;
+  academicYear: string;
+  fontScale: number;
+  highContrast: boolean;
+  ttsEnabled: boolean;
+  language: "en" | "ne" | "hi";
+  colorMode: "light" | "dark" | "auto";
+  attendanceThreshold: number;
+  defaultSlideTheme: SlideThemeId;
+  notifyAttendance: boolean;
+  notifyGrades: boolean;
+  notifyReminders: boolean;
+  notifyCalendar: boolean;
+  backupNudgeDays: number;
+  lastBackupAt?: string;
+  onboardingDone: boolean;
+  breakReminders: boolean;
 };

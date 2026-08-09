@@ -34,3 +34,123 @@ export function downloadText(filename: string, content: string, mime = "text/pla
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export async function fileToExamFile(file: File): Promise<{
+  fileName: string;
+  mime: string;
+  sizeLabel: string;
+  dataUrl?: string;
+}> {
+  const sizeLabel = formatBytes(file.size);
+  if (file.size > 1_500_000) {
+    return { fileName: file.name, mime: file.type || "application/octet-stream", sizeLabel };
+  }
+  const dataUrl = await fileToDataUrl(file);
+  return { fileName: file.name, mime: file.type || "application/octet-stream", sizeLabel, dataUrl };
+}
+
+export async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Best-effort text pull from uploaded books (txt works; PDF may be sparse without a PDF engine). */
+export async function extractTextbookText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") || file.type.startsWith("text/")) {
+    return (await file.text()).slice(0, 200_000);
+  }
+  // Try decoding a slice — some PDFs include plain text streams
+  try {
+    const buf = await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer();
+    const raw = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+    const cleaned = raw
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\u0900-\u097F\u0980-\u09FF]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned.length > 400 && /chapter|अध्याय|unit|एकाइ/i.test(cleaned)) {
+      return cleaned.slice(0, 120_000);
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+export function openDataUrl(dataUrl: string, fileName?: string) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.target = "_blank";
+  a.rel = "noreferrer";
+  if (fileName) a.download = fileName;
+  a.click();
+}
+
+/** Parse CSV with header row. Supports simple quoted fields. */
+export function parseCsv(text: string): Record<string, string>[] {
+  const lines = text.replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = splitCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const cells = splitCsvLine(line);
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      row[h] = (cells[i] ?? "").trim();
+    });
+    return row;
+  });
+}
+
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+export function extToMaterialType(name: string): "pdf" | "docx" | "pptx" | "image" | "video" | "audio" | "other" {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return "pdf";
+  if (ext === "doc" || ext === "docx") return "docx";
+  if (ext === "ppt" || ext === "pptx") return "pptx";
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+  if (["mp4", "webm", "mov"].includes(ext)) return "video";
+  if (["mp3", "wav", "m4a"].includes(ext)) return "audio";
+  return "other";
+}

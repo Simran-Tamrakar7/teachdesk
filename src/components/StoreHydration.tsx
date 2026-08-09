@@ -6,6 +6,7 @@ import { useEffect } from "react";
 /** Ensures persist finishes so login → dashboard isn't stuck on "Loading…" */
 export function StoreHydration() {
   const setHydrated = useAppStore((s) => s.setHydrated);
+  const colorMode = useAppStore((s) => s.colorMode);
 
   useEffect(() => {
     const finish = () => setHydrated();
@@ -18,6 +19,10 @@ export function StoreHydration() {
       window.clearTimeout(t);
     };
   }, [setHydrated]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", colorMode === "dark");
+  }, [colorMode]);
 
   return null;
 }

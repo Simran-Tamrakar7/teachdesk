@@ -8,7 +8,6 @@ import type {
   Holiday,
   LessonPlan,
   Material,
-  Message,
   ResearchItem,
   SchoolClass,
   Student,
@@ -19,34 +18,24 @@ import type {
 export const DEMO_USERS: User[] = [
   {
     id: "u1",
-    name: "Priya Sharma",
-    email: "priya@greenfield.edu",
+    name: "Rigosha Basnet",
+    email: "rigosha.basnet@teachdesk.app",
+    username: "rigosha.basnet",
+    password: "rigosha",
     role: "teacher",
     subject: "Science",
-    avatarInitials: "PS",
+    avatarInitials: "RB",
+    classIds: ["c1", "c2", "c3", "c6"],
+    defaultSlideTheme: "forest",
   },
-  {
-    id: "u2",
-    name: "Rajesh Thapa",
-    email: "principal@greenfield.edu",
-    role: "admin",
-    avatarInitials: "RT",
-  },
-  {
-    id: "u3",
-    name: "Anita Gurung",
-    email: "anita@greenfield.edu",
-    role: "hod",
-    subject: "Science",
-    avatarInitials: "AG",
-  },
-  {
-    id: "u4",
-    name: "Sita Devi",
-    email: "sita.parent@email.com",
-    role: "parent",
-    avatarInitials: "SD",
-  },
+];
+
+export const SUBJECTS = [
+  { id: "sub-science", name: "Science", code: "SCI" },
+  { id: "sub-math", name: "Mathematics", code: "MATH" },
+  { id: "sub-english", name: "English", code: "ENG" },
+  { id: "sub-nepali", name: "Nepali", code: "NEP" },
+  { id: "sub-social", name: "Social Studies", code: "SOC" },
 ];
 
 export const CLASSES: SchoolClass[] = [
@@ -57,7 +46,7 @@ export const CLASSES: SchoolClass[] = [
     section: "A",
     subject: "Science",
     teacherId: "u1",
-    schedule: "Mon/Wed/Fri 9:00–9:45",
+    schedule: "Sun/Wed/Fri 9:00–9:45",
   },
   {
     id: "c2",
@@ -75,7 +64,16 @@ export const CLASSES: SchoolClass[] = [
     section: "A",
     subject: "Science",
     teacherId: "u1",
-    schedule: "Mon/Wed 11:00–11:45",
+    schedule: "Sun/Fri 11:00–11:45",
+  },
+  {
+    id: "c6",
+    name: "Class 6 — Social Studies",
+    grade: "6",
+    section: "A",
+    subject: "Social Studies",
+    teacherId: "u1",
+    schedule: "Sun/Tue/Thu 9:00–9:45",
   },
 ];
 
@@ -143,6 +141,154 @@ export const CHAPTERS: Chapter[] = [
     ],
     pageStart: 59,
     pageEnd: 88,
+  },
+  {
+    id: "ch6-1",
+    subjectId: "social",
+    classId: "c6",
+    title: "Our Earth",
+    unitNumber: 1,
+    lang: "en",
+    summary:
+      "Introduces Earth as our home: land, water, air, day and night, and why we care for the environment.",
+    keyTerms: ["Earth", "Continent", "Ocean", "Atmosphere", "Environment"],
+    objectives: [
+      "Describe Earth as a living place for people, plants and animals",
+      "Name major land and water forms",
+      "Explain simple ways to protect the environment",
+    ],
+    discussionQuestions: [
+      "What do we get from the Earth every day?",
+      "How can Class 6 students help keep their area clean?",
+    ],
+    body: `Chapter 1 — Our Earth
+
+Earth is the planet where we live. It has land, water and air. Continents are large land masses. Oceans and seas cover most of the Earth’s surface. The atmosphere is the layer of air around Earth.
+
+We depend on soil for farming, water for drinking, and clean air for breathing. When we cut too many trees or throw waste carelessly, the environment becomes unhealthy.
+
+Caring for Earth means planting trees, saving water, and keeping our school and home clean.`,
+    ne: {
+      title: "हाम्रो पृथ्वी",
+      summary: "हाम्रो घर पृथ्वी: जमिन, पानी, हावा, दिन-रात र वातावरण संरक्षणको परिचय।",
+      keyTerms: ["पृथ्वी", "महाद्वीप", "महासागर", "वायुमण्डल", "वातावरण"],
+      objectives: [
+        "पृथ्वीलाई मानिस, वनस्पति र जनावरको बासस्थान भनेर वर्णन गर्ने",
+        "प्रमुख भू-आकृति र जल-आकृति नाम बताउने",
+        "वातावरण जोगाउने सरल उपाय बताउने",
+      ],
+      discussionQuestions: [
+        "हामीले पृथ्वीबाट दैनिक के-के पाउँछौं?",
+        "कक्षा ६ का विद्यार्थीले आफ्नो क्षेत्र सफा राख्न के गर्न सक्छन्?",
+      ],
+      body: `अध्याय १ — हाम्रो पृथ्वी
+
+पृथ्वी हामी बस्ने ग्रह हो। यसमा जमिन, पानी र हावा छ। महाद्वीप ठूला स्थलभाग हुन्। महासागर र समुद्रले पृथ्वीको धेरै भाग ढाकेका छन्। वायुमण्डल पृथ्वी वरिपरिको हावाको तह हो।
+
+हामी खेतीका लागि माटो, पिउनका लागि पानी र सास फेर्न सफा हावामा निर्भर छौं। धेरै रुख काट्दा वा फोहोर जथाभावी फाल्दा वातावरण बिग्रन्छ।
+
+पृथ्वीको हेरचाह भनेको रुख रोप्नु, पानी बचत गर्नु र घर-स्कूल सफा राख्नु हो।`,
+    },
+    pageStart: 1,
+    pageEnd: 18,
+  },
+  {
+    id: "ch6-2",
+    subjectId: "social",
+    classId: "c6",
+    title: "Our Society and Culture",
+    unitNumber: 2,
+    lang: "en",
+    summary: "Family, community, festivals, languages and living together with respect in Nepal.",
+    keyTerms: ["Society", "Culture", "Festival", "Tradition", "Respect"],
+    objectives: [
+      "Explain what a society is",
+      "Give examples of Nepali cultural practices",
+      "Show respect for different languages and religions",
+    ],
+    discussionQuestions: [
+      "Which festival does your family celebrate?",
+      "Why should we respect friends from other communities?",
+    ],
+    body: `Chapter 2 — Our Society and Culture
+
+A society is a group of people who live together and help one another. In Nepal, families, neighbours, schools and villages form our society.
+
+Culture includes language, food, dress, music, dance and festivals. Dashain, Tihar, Holi, Eid, Christmas and many local festivals show our diversity.
+
+When we respect each other’s traditions, society becomes peaceful and strong.`,
+    ne: {
+      title: "हाम्रो समाज र संस्कृति",
+      summary: "परिवार, समुदाय, चाडपर्व, भाषा र नेपालमा सद्भावपूर्ण सहअस्तित्व।",
+      keyTerms: ["समाज", "संस्कृति", "चाडपर्व", "परम्परा", "सम्मान"],
+      objectives: [
+        "समाज के हो भनेर व्याख्या गर्ने",
+        "नेपाली सांस्कृतिक अभ्यासका उदाहरण दिने",
+        "फरक भाषा र धर्मप्रति सम्मान देखाउने",
+      ],
+      discussionQuestions: [
+        "तपाईंको परिवार कुन चाड मनाउँछ?",
+        "अर्को समुदायका साथीलाई किन सम्मान गर्नुपर्छ?",
+      ],
+      body: `अध्याय २ — हाम्रो समाज र संस्कृति
+
+समाज भनेको सँगै बसेर एकअर्कालाई सहयोग गर्ने मानिसहरूको समूह हो। नेपालमा परिवार, छरछिमेक, स्कूल र गाउँ हाम्रो समाज हुन्।
+
+संस्कृतिमा भाषा, खाना, पोशाक, संगीत, नृत्य र चाडपर्व पर्छन्। दशैं, तिहार, होली, ईद, क्रिसमस लगायतका चाडले हाम्रो विविधता देखाउँछन्।
+
+एकअर्काको परम्परालाई सम्मान गर्दा समाज शान्तिपूर्ण र बलियो हुन्छ।`,
+    },
+    pageStart: 19,
+    pageEnd: 36,
+  },
+  {
+    id: "ch6-3",
+    subjectId: "social",
+    classId: "c6",
+    title: "Civic Life and Responsibility",
+    unitNumber: 3,
+    lang: "en",
+    summary: "Rules, rights, duties, helping neighbours, and being a good citizen at school and home.",
+    keyTerms: ["Citizen", "Duty", "Right", "Rule", "Responsibility"],
+    objectives: [
+      "List basic duties of a student citizen",
+      "Differentiate rights and responsibilities",
+      "Practice following classroom and community rules",
+    ],
+    discussionQuestions: [
+      "What rule helps your classroom the most?",
+      "How do you help at home without being asked?",
+    ],
+    body: `Chapter 3 — Civic Life and Responsibility
+
+A good citizen follows rules, tells the truth, and helps others. Students have the right to learn in a safe school. They also have the duty to study, respect teachers, and keep the school clean.
+
+Rights and duties go together. If we only demand rights and ignore duties, community life becomes difficult.
+
+Small actions — waiting your turn, sharing, and reporting problems politely — build civic sense.`,
+    ne: {
+      title: "नागरिक जीवन र जिम्मेवारी",
+      summary: "नियम, अधिकार, कर्तव्य, छरछिमेकलाई सहयोग र असल नागरिक बन्ने अभ्यास।",
+      keyTerms: ["नागरिक", "कर्तव्य", "अधिकार", "नियम", "जिम्मेवारी"],
+      objectives: [
+        "विद्यार्थी नागरिकका आधारभूत कर्तव्य सूचीबद्ध गर्ने",
+        "अधिकार र जिम्मेवारी छुट्याउने",
+        "कक्षा र समुदायका नियम पालना गर्ने अभ्यास गर्ने",
+      ],
+      discussionQuestions: [
+        "तपाईंको कक्षामा कुन नियम सबैभन्दा उपयोगी छ?",
+        "नभने पनि घरमा कसरी सहयोग गर्नुहुन्छ?",
+      ],
+      body: `अध्याय ३ — नागरिक जीवन र जिम्मेवारी
+
+असल नागरिक नियम मान्छ, सत्य बोल्छ र अरूलाई सहयोग गर्छ। विद्यार्थीलाई सुरक्षित स्कूलमा पढ्ने अधिकार छ। उनीहरूको कर्तव्य पढ्नु, शिक्षकलाई सम्मान गर्नु र स्कूल सफा राख्नु हो।
+
+अधिकार र कर्तव्य सँगै जान्छन्। अधिकार मात्र माग्ने र कर्तव्य बिर्सने हो भने सामुदायिक जीवन गाह्रो हुन्छ।
+
+पालो पर्खनु, बाँड्नु र समस्या शिष्ट तरिकाले भन्नु जस्ता साना कामले नागरिक चेतना बढाउँछ।`,
+    },
+    pageStart: 37,
+    pageEnd: 52,
   },
 ];
 
@@ -313,12 +459,26 @@ export const STUDENTS: Student[] = [
 export const ASSESSMENTS: Assessment[] = [
   {
     id: "a1",
-    title: "Photosynthesis Quiz",
+    title: "Unit Test 1 — Photosynthesis",
     classId: "c1",
+    subject: "Science",
     chapterId: "ch1",
-    type: "quiz",
+    chapterIds: ["ch1"],
+    type: "exam",
     maxMarks: 20,
+    passMark: 8,
     date: "2026-08-05",
+    term: "Term 1",
+    paper: {
+      fileName: "unit-test-1-photosynthesis.pdf",
+      mime: "application/pdf",
+      sizeLabel: "240 KB",
+    },
+    answerKey: {
+      fileName: "unit-test-1-answer-key.pdf",
+      mime: "application/pdf",
+      sizeLabel: "90 KB",
+    },
     questions: [
       {
         id: "q1",
@@ -355,10 +515,33 @@ export const ASSESSMENTS: Assessment[] = [
     id: "a2",
     title: "Unit 1 Mid-term Test",
     classId: "c1",
+    subject: "Science",
     chapterId: "ch1",
-    type: "test",
+    chapterIds: ["ch1", "ch2"],
+    type: "exam",
     maxMarks: 50,
+    passMark: 20,
     date: "2026-08-20",
+    term: "Term 1",
+    paper: {
+      fileName: "midterm-unit1.pdf",
+      mime: "application/pdf",
+      sizeLabel: "410 KB",
+    },
+    questions: [],
+  },
+  {
+    id: "a3",
+    title: "Respiration short quiz",
+    classId: "c1",
+    subject: "Science",
+    chapterId: "ch2",
+    chapterIds: ["ch2"],
+    type: "quiz",
+    maxMarks: 10,
+    passMark: 4,
+    date: "2026-07-22",
+    term: "Term 1",
     questions: [],
   },
 ];
@@ -372,6 +555,10 @@ export const GRADES: GradeEntry[] = [
   { id: "g6", assessmentId: "a1", studentId: "s6", marks: 17 },
   { id: "g7", assessmentId: "a1", studentId: "s7", marks: 14 },
   { id: "g8", assessmentId: "a1", studentId: "s8", marks: 20 },
+  { id: "g9", assessmentId: "a3", studentId: "s1", marks: 9 },
+  { id: "g10", assessmentId: "a3", studentId: "s2", marks: 7 },
+  { id: "g11", assessmentId: "a3", studentId: "s3", marks: 5 },
+  { id: "g12", assessmentId: "a3", studentId: "s5", marks: 4 },
 ];
 
 function attendanceSeed(): AttendanceRecord[] {
@@ -448,27 +635,6 @@ export const ANNOUNCEMENTS: Announcement[] = [
   },
 ];
 
-export const MESSAGES: Message[] = [
-  {
-    id: "msg1",
-    to: "sita.parent@email.com",
-    from: "priya@greenfield.edu",
-    subject: "Aarav — excellent quiz result",
-    body: "Dear Sita, Aarav scored 18/20 on the Photosynthesis quiz. He participated thoughtfully in discussion. Keep encouraging his curiosity!",
-    createdAt: "2026-08-06T16:00:00Z",
-    read: true,
-  },
-  {
-    id: "msg2",
-    to: "priya@greenfield.edu",
-    from: "sita.parent@email.com",
-    subject: "Re: Homework clarification",
-    body: "Thank you for the note. Could you confirm if the lab report is due Thursday or Friday?",
-    createdAt: "2026-08-08T19:30:00Z",
-    read: false,
-  },
-];
-
 export const RESEARCH: ResearchItem[] = [
   {
     id: "r1",
@@ -495,17 +661,79 @@ export const RESEARCH: ResearchItem[] = [
 ];
 
 export const TIMETABLE: TimetableSlot[] = [
-  { id: "t1", day: "Monday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
-  { id: "t2", day: "Monday", period: 3, time: "11:00–11:45", classId: "c3", subject: "Science", room: "Room 14" },
-  { id: "t3", day: "Wednesday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
-  { id: "t4", day: "Wednesday", period: 3, time: "11:00–11:45", classId: "c3", subject: "Science", room: "Room 14" },
-  { id: "t5", day: "Friday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
-  { id: "t6", day: "Tuesday", period: 2, time: "10:00–10:45", classId: "c2", subject: "Science", room: "Lab 2" },
-  { id: "t7", day: "Thursday", period: 2, time: "10:00–10:45", classId: "c2", subject: "Science", room: "Lab 2" },
+  { id: "t1", day: "Sunday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
+  { id: "t2", day: "Sunday", period: 3, time: "11:00–11:45", classId: "c3", subject: "Science", room: "Room 14" },
+  { id: "t3", day: "Monday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
+  { id: "t4", day: "Tuesday", period: 2, time: "10:00–10:45", classId: "c2", subject: "Science", room: "Lab 2" },
+  { id: "t5", day: "Wednesday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
+  { id: "t6", day: "Thursday", period: 2, time: "10:00–10:45", classId: "c2", subject: "Science", room: "Lab 2" },
+  { id: "t7", day: "Friday", period: 1, time: "9:00–9:45", classId: "c1", subject: "Science", room: "Lab 2" },
+  { id: "t8", day: "Friday", period: 3, time: "11:00–11:45", classId: "c3", subject: "Science", room: "Room 14" },
 ];
 
 export const HOLIDAYS: Holiday[] = [
-  { id: "h1", title: "Independence Day", date: "2026-08-15", type: "holiday" },
-  { id: "h2", title: "Mid-term exam window", date: "2026-08-18", type: "exam" },
-  { id: "h3", title: "Term 1 ends", date: "2026-09-30", type: "term" },
+  { id: "h1", title: "Independence Day (Nepal)", date: "2026-08-15", type: "holiday", notes: "Public holiday" },
+  { id: "h2", title: "Teej (Haritalika)", date: "2026-09-09", type: "holiday", notes: "School closed" },
+  { id: "h3", title: "Dashain vacation starts", date: "2026-10-10", type: "holiday", notes: "Long break — confirm with school calendar" },
+  { id: "h4", title: "Tihar / Deepawali period", date: "2026-11-05", type: "holiday", notes: "Festival holidays" },
+  { id: "h5", title: "Constitution Day", date: "2026-09-19", type: "holiday" },
+  { id: "h6", title: "Maghe Sankranti", date: "2027-01-15", type: "holiday" },
+  { id: "h7", title: "Holi", date: "2027-03-03", type: "holiday" },
+  { id: "h8", title: "Buddha Jayanti", date: "2027-05-12", type: "holiday" },
+  { id: "h9", title: "Mid-term exam window", date: "2026-08-18", type: "exam", notes: "Edit dates as needed" },
+  { id: "h10", title: "Term 1 ends", date: "2026-09-30", type: "term" },
+  { id: "h11", title: "Science museum field trip (8A)", date: "2026-08-28", type: "field_trip", notes: "Permission slips due Aug 25" },
 ];
+
+export const NOTES = [
+  {
+    id: "n1",
+    title: "Lab safety reminder",
+    body: "Remind 8A to bring lab coats on Friday. Check iodine stock before period 1.",
+    classId: "c1",
+    pinned: true,
+    createdAt: "2026-08-08T09:00:00Z",
+    updatedAt: "2026-08-08T09:00:00Z",
+  },
+  {
+    id: "n2",
+    title: "Parent meeting notes",
+    body: "Discuss Aarav’s strong quiz score and encourage home vocabulary practice.",
+    studentId: "s1",
+    pinned: false,
+    createdAt: "2026-08-07T16:00:00Z",
+    updatedAt: "2026-08-07T16:00:00Z",
+  },
+];
+
+export const REMINDERS = [
+  {
+    id: "rm1",
+    title: "Collect permission slips — museum trip",
+    dueAt: "2026-08-25",
+    done: false,
+    classId: "c1",
+    recurrence: "none" as const,
+    createdAt: "2026-08-08T10:00:00Z",
+  },
+  {
+    id: "rm2",
+    title: "Submit mid-term marks",
+    dueAt: "2026-08-22",
+    done: false,
+    recurrence: "friday" as const,
+    createdAt: "2026-08-08T10:05:00Z",
+  },
+  {
+    id: "rm3",
+    title: "Print photosynthesis worksheets",
+    dueAt: "2026-08-11",
+    done: true,
+    classId: "c1",
+    recurrence: "none" as const,
+    createdAt: "2026-08-06T08:00:00Z",
+  },
+];
+
+/** Nepal school week: Sunday–Friday (Saturday off) */
+export const SCHOOL_WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const;
