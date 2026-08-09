@@ -38,15 +38,139 @@ function pickKeyTerms(text: string, lang: ContentLang): string[] {
 }
 
 /** Split pasted/extracted book text into chapters by common EN/NE heading patterns. */
+export type TocEntry = { unitNumber: number; title: string; pageStart: number; pageEnd?: number };
+
+/** Parse Unit / Topic / Page TOC tables and "1 Title 18" style lines. */
+export function parseTocEntries(text: string): TocEntry[] {
+  const lines = text
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((l) => !/^(unit|topic|page|contents?|table of contents)$/i.test(l));
+
+  const entries: TocEntry[] = [];
+  for (const line of lines) {
+    // "1 Scientific Learning 1" or "Unit 2 Information … 18"
+    let m = line.match(
+      /^(?:(?:Unit|Chapter|अध्याय|एकाइ|पाठ)\s*)?(\d{1,2})\s+(.+?)\s+(\d{1,4})\s*$/i
+    );
+    if (!m) {
+      // Tab / multi-space columns: 1 \t Scientific Learning \t 1
+      m = line.match(/^(\d{1,2})\s{2,}(.+?)\s{2,}(\d{1,4})\s*$/);
+    }
+    if (!m) continue;
+    const unitNumber = Number(m[1]);
+    const title = m[2].replace(/\s+/g, " ").replace(/\.+$/, "").trim();
+    const pageStart = Number(m[3]);
+    if (!unitNumber || !title || !pageStart) continue;
+    if (title.length < 3 || title.length > 120) continue;
+    entries.push({ unitNumber, title, pageStart });
+  }
+
+  // Dedupe by unit number (keep first)
+  const byUnit = new Map<number, TocEntry>();
+  for (const e of entries) {
+    if (!byUnit.has(e.unitNumber)) byUnit.set(e.unitNumber, e);
+  }
+  const ordered = [...byUnit.values()].sort((a, b) => a.unitNumber - b.unitNumber);
+  for (let i = 0; i < ordered.length; i++) {
+    ordered[i].pageEnd =
+      i + 1 < ordered.length ? Math.max(ordered[i].pageStart, ordered[i + 1].pageStart - 1) : ordered[i].pageStart + 24;
+  }
+  return ordered.length >= 2 ? ordered : [];
+}
+
+export const GRADE8_SCIENCE_TOC: TocEntry[] = [
+  { unitNumber: 1, title: "Scientific Learning", pageStart: 1, pageEnd: 17 },
+  { unitNumber: 2, title: "Information and Communication Technology", pageStart: 18, pageEnd: 54 },
+  { unitNumber: 3, title: "Living Beings and Their Structure", pageStart: 55, pageEnd: 88 },
+  { unitNumber: 4, title: "Biodiversity and Environment", pageStart: 89, pageEnd: 111 },
+  { unitNumber: 5, title: "Life Process", pageStart: 112, pageEnd: 151 },
+  { unitNumber: 6, title: "Force and Motion", pageStart: 152, pageEnd: 184 },
+  { unitNumber: 7, title: "Energy in Daily Life", pageStart: 185, pageEnd: 226 },
+  { unitNumber: 8, title: "Electricity and Magnetism", pageStart: 227, pageEnd: 249 },
+  { unitNumber: 9, title: "Matter", pageStart: 250, pageEnd: 276 },
+  { unitNumber: 10, title: "Materials Used in Daily Life", pageStart: 277, pageEnd: 301 },
+  { unitNumber: 11, title: "The Earth and Universe", pageStart: 302, pageEnd: 330 },
+];
+
+function chaptersFromToc(
+  toc: TocEntry[],
+  opts: { classId: string; subjectId: string; materialId?: string; lang?: ContentLang; sourceBook?: string; bodyByUnit?: Record<number, string> }
+): Omit<Chapter, "id">[] {
+  const lang = opts.lang ?? "en";
+  return toc.map((e) => {
+    const body =
+      opts.bodyByUnit?.[e.unitNumber]?.trim() ||
+      `Unit ${e.unitNumber}: ${e.title}\n\nPages ${e.pageStart}–${e.pageEnd ?? e.pageStart}.\n\nPaste or extract this unit’s text here after opening the chapter. The table of contents was used to build this card.`;
+    const words = body.split(/\s+/).filter(Boolean).length;
+    return {
+      subjectId: opts.subjectId,
+      classId: opts.classId,
+      materialId: opts.materialId,
+      title: e.title,
+      unitNumber: e.unitNumber,
+      lang,
+      summary: `Unit ${e.unitNumber} — ${e.title} (pp. ${e.pageStart}–${e.pageEnd ?? e.pageStart}).`,
+      keyTerms: [],
+      objectives:
+        lang === "ne"
+          ? ["एकाइका मुख्य विचार बुझ्ने", "महत्वपूर्ण शब्द प्रयोग गर्ने"]
+          : ["Understand the unit’s main ideas", "Use key vocabulary"],
+      discussionQuestions: [`What is the main idea of “${e.title}”?`],
+      body,
+      wordCount: words,
+      pageStart: e.pageStart,
+      pageEnd: e.pageEnd ?? e.pageStart,
+      sourceBook: opts.sourceBook,
+    };
+  });
+}
+
+function looksLikeScienceBook(fileName: string, subjectId?: string) {
+  return /science|technology|physics|chemistry|biology|भौतिक|रसायन|जीव|विज्ञान/i.test(
+    `${fileName} ${subjectId ?? ""}`
+  );
+}
+
 export function parseChaptersFromText(
   text: string,
   opts: { classId: string; subjectId: string; materialId?: string; lang?: ContentLang; sourceBook?: string }
 ): Omit<Chapter, "id">[] {
   const lang = opts.lang ?? (/[\u0900-\u097F]/.test(text) ? "ne" : "en");
-  let cleaned = text.replace(/\r/g, "").trim();
+  const cleaned = text.replace(/\r/g, "").trim();
   if (!cleaned) return [];
 
-  // Prefer Chapter/Unit heading lines (also covers TOC-style entries)
+  // 1) TOC table → chapter cards with real page ranges
+  const toc = parseTocEntries(cleaned);
+  if (toc.length >= 2) {
+    // If full book text exists after TOC, attach bodies by scanning Chapter/Unit headings
+    const bodyByUnit: Record<number, string> = {};
+    const headingRe = /(?:^|\n)\s*((?:Chapter|Unit|अध्याय|एकाइ|पाठ)\s*[\d०-९]+[^\n]*)/gi;
+    const marks: { index: number; unit: number }[] = [];
+    let hm: RegExpExecArray | null;
+    while ((hm = headingRe.exec(cleaned))) {
+      const numMatch = hm[1].match(/[\d०-९]+/);
+      let unit = marks.length + 1;
+      if (numMatch) {
+        const raw = numMatch[0];
+        unit = /[०-९]/.test(raw)
+          ? Number([...raw].map((d) => "०१२३४५६७८९".indexOf(d)).join(""))
+          : Number(raw);
+      }
+      marks.push({ index: hm.index + (hm[0].startsWith("\n") ? 1 : 0), unit: Number.isFinite(unit) ? unit : marks.length + 1 });
+    }
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i].index;
+      const end = i + 1 < marks.length ? marks[i + 1].index : cleaned.length;
+      const body = cleaned.slice(start, end).trim();
+      if (body.length > 80) bodyByUnit[marks[i].unit] = body;
+    }
+    return chaptersFromToc(toc, { ...opts, lang, bodyByUnit });
+  }
+
+  // Prefer Chapter/Unit heading lines
   const headingRe = /(?:^|\n)\s*((?:Chapter|Unit|अध्याय|एकाइ|पाठ)\s*[\d०-९]+[^\n]*)/gi;
   const marks: { index: number; title: string }[] = [];
   let m: RegExpExecArray | null;
@@ -91,14 +215,13 @@ export function parseChaptersFromText(
       }
       offset += line.length + 1;
     }
-    // Deduplicate near-duplicate marks
     marks.sort((a, b) => a.index - b.index);
     for (let i = marks.length - 1; i > 0; i--) {
       if (marks[i].index - marks[i - 1].index < 40) marks.splice(i, 1);
     }
   }
 
-  const chunks: { title: string; body: string; unitNumber: number }[] = [];
+  const chunks: { title: string; body: string; unitNumber: number; pageStart?: number; pageEnd?: number }[] = [];
   if (marks.length >= 1) {
     for (let i = 0; i < marks.length; i++) {
       const start = marks[i].index;
@@ -116,7 +239,6 @@ export function parseChaptersFromText(
       });
     }
   } else {
-    // Best-guess: split into ~equal paragraph groups
     const paras = cleaned
       .split(/\n{2,}/)
       .map((p) => p.trim())
@@ -155,8 +277,8 @@ export function parseChaptersFromText(
           : [`What did you learn from ${c.title}?`, "How does this connect to daily life?"],
       body: c.body,
       wordCount: words,
-      pageStart: (c.unitNumber - 1) * 12 + 1,
-      pageEnd: c.unitNumber * 12,
+      pageStart: c.pageStart ?? (c.unitNumber - 1) * 12 + 1,
+      pageEnd: c.pageEnd ?? c.unitNumber * 12,
       sourceBook: opts.sourceBook,
     };
   });
@@ -165,20 +287,27 @@ export function parseChaptersFromText(
 export async function splitTextbookIntoChapters(
   fileName: string,
   extractedText?: string,
-  opts?: { classId: string; subjectId: string; materialId?: string; lang?: ContentLang }
+  opts?: { classId: string; subjectId: string; materialId?: string; lang?: ContentLang; sourceBook?: string }
 ): Promise<Omit<Chapter, "id">[]> {
-  await delay(900);
-  if (extractedText && extractedText.trim().length > 80) {
-    return parseChaptersFromText(extractedText, {
-      classId: opts?.classId ?? "c1",
-      subjectId: opts?.subjectId ?? "science",
-      materialId: opts?.materialId,
-      lang: opts?.lang,
-    });
+  await delay(600);
+  const classId = opts?.classId ?? "c1";
+  const subjectId = opts?.subjectId ?? "science";
+  const lang = opts?.lang;
+  const baseOpts = { classId, subjectId, materialId: opts?.materialId, lang, sourceBook: opts?.sourceBook };
+
+  if (extractedText && extractedText.trim().length > 40) {
+    const fromText = parseChaptersFromText(extractedText, baseOpts);
+    if (fromText.length) return fromText;
   }
 
-  const social = /social|सामाजिक|civics|geography|हाम्रो/i.test(fileName + (opts?.subjectId ?? ""));
-  if (social || opts?.subjectId === "social") {
+  // PDF often has no extractable text — use known Grade 8 Science TOC for matching books
+  if (looksLikeScienceBook(fileName, subjectId) || /grade[- ]?8|class[- ]?8|८/i.test(fileName)) {
+    return chaptersFromToc(GRADE8_SCIENCE_TOC, { ...baseOpts, subjectId: "science" });
+  }
+
+  const socialOnly =
+    /social|सामाजिक|civics|geography|हाम्रो/i.test(fileName + subjectId) && !looksLikeScienceBook(fileName, subjectId);
+  if (socialOnly) {
     return parseChaptersFromText(
       `Chapter 1 Our Earth
 Earth is our home with land, water and air. We must care for the environment.
@@ -188,16 +317,11 @@ Nepal is rich in festivals, languages and traditions. Respect makes society stro
 
 Chapter 3 Civic Life and Responsibility
 Good citizens follow rules, help others, and balance rights with duties.`,
-      {
-        classId: opts?.classId ?? "c6",
-        subjectId: "social",
-        materialId: opts?.materialId,
-        lang: "en",
-      }
+      { ...baseOpts, subjectId: "social", lang: "en" }
     );
   }
 
-  const base = fileName.replace(/\.[^.]+$/, "");
+  const base = fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
   return parseChaptersFromText(
     `Chapter 1 ${base} — Foundations
 This unit introduces the core ideas of the textbook. Students learn vocabulary and main concepts.
@@ -207,12 +331,7 @@ Learners apply ideas through examples, diagrams and short activities.
 
 Chapter 3 ${base} — Review
 Students summarise learning and prepare discussion questions for class.`,
-    {
-      classId: opts?.classId ?? "c1",
-      subjectId: opts?.subjectId ?? "science",
-      materialId: opts?.materialId,
-      lang: "en",
-    }
+    { ...baseOpts, lang: "en" }
   );
 }
 

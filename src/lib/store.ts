@@ -283,6 +283,7 @@ type AppState = {
   updateMaterial: (id: string, patch: Partial<Material>) => void;
   removeMaterial: (id: string) => void;
   addChapters: (chs: Chapter[]) => void;
+  replaceChaptersForMaterial: (materialId: string, chs: Chapter[]) => void;
   updateChapter: (id: string, patch: Partial<Chapter>) => void;
   removeChapter: (id: string) => void;
   clearClassLibrary: (classId: string) => void;
@@ -867,6 +868,10 @@ export const useAppStore = create<AppState>()(
           audit("remove_material", m.title);
         },
         addChapters: (chs) => set({ chapters: [...get().chapters, ...chs] }),
+        replaceChaptersForMaterial: (materialId, chs) =>
+          set({
+            chapters: [...get().chapters.filter((c) => c.materialId !== materialId), ...chs],
+          }),
         updateChapter: (id, patch) =>
           set({ chapters: get().chapters.map((c) => (c.id === id ? { ...c, ...patch } : c)) }),
         removeChapter: (id) => {

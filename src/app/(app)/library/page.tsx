@@ -40,6 +40,7 @@ export default function LibraryPage() {
   const updateMaterial = useAppStore((s) => s.updateMaterial);
   const removeMaterial = useAppStore((s) => s.removeMaterial);
   const addChapters = useAppStore((s) => s.addChapters);
+  const replaceChaptersForMaterial = useAppStore((s) => s.replaceChaptersForMaterial);
   const updateChapter = useAppStore((s) => s.updateChapter);
   const removeChapter = useAppStore((s) => s.removeChapter);
   const clearClassLibrary = useAppStore((s) => s.clearClassLibrary);
@@ -138,12 +139,18 @@ export default function LibraryPage() {
     if (splitOnUpload && (extracted || type === "pdf" || type === "other")) {
       setBusy("split");
       setProgress({ pct: 62, label: "Detecting chapter boundaries…" });
-      const subjectId = (cls?.subject ?? "social").toLowerCase().includes("social") ? "social" : "science";
+      const fromName = /science|technology|विज्ञान/i.test(`${title} ${fileName}`);
+      const subjectId = fromName
+        ? "science"
+        : (cls?.subject ?? "social").toLowerCase().includes("social")
+          ? "social"
+          : "science";
       const detected = await splitTextbookIntoChapters(fileName, extracted, {
         classId,
         subjectId,
         materialId,
         lang: uploadLang,
+        sourceBook: title,
       });
       setProgress({ pct: 88, label: "Writing chapter cards…" });
       const withIds = detected.map((c) => ({
@@ -152,11 +159,14 @@ export default function LibraryPage() {
         sourceBook: title,
         materialId,
       })) as Chapter[];
-      addChapters(withIds);
+      // Replace any prior extract for this book — never stack duplicates
+      replaceChaptersForMaterial(materialId, withIds);
       if (withIds[0]) setSelectedChapter(withIds[0].id);
       setLang(uploadLang);
       setAiNote(
-        `Saved “${title}”. Split into ${withIds.length} chapters (best-guess). Open a chapter card to read, adjust, or use Understand tools.`
+        extracted.trim().length > 40
+          ? `Saved “${title}”. Split into ${withIds.length} units from text/TOC.`
+          : `Saved “${title}”. PDF text wasn’t readable, so built ${withIds.length} unit cards from the book TOC (page ranges). Paste unit text later or re-extract after pasting the contents list.`
       );
     } else {
       setAiNote(`Saved “${title}”. Open the book or use Extract chapters.`);
@@ -175,15 +185,23 @@ export default function LibraryPage() {
     setBusy("split");
     setProgress({ pct: 30, label: "Detecting chapters…" });
     const text = m.extractedText || m.contentPreview || "";
-    const subjectId = (cls?.subject ?? "social").toLowerCase().includes("social") ? "social" : "science";
-    const detected = await splitTextbookIntoChapters(m.versions.at(-1)?.fileName ?? m.title, text, {
+    const fileName = m.versions.at(-1)?.fileName ?? m.title;
+    const fromName = /science|technology|विज्ञान/i.test(`${m.title} ${fileName}`);
+    const subjectId = fromName
+      ? "science"
+      : (cls?.subject ?? "social").toLowerCase().includes("social")
+        ? "social"
+        : "science";
+    const detected = await splitTextbookIntoChapters(fileName, text, {
       classId,
       subjectId,
       materialId: m.id,
       lang: m.lang ?? lang,
+      sourceBook: m.title,
     });
     setProgress({ pct: 80, label: "Saving chapter cards…" });
-    addChapters(
+    replaceChaptersForMaterial(
+      m.id,
       detected.map((c) => ({
         ...c,
         id: uid("ch"),
@@ -191,7 +209,7 @@ export default function LibraryPage() {
         materialId: m.id,
       })) as Chapter[]
     );
-    setAiNote(`Re-extracted ${detected.length} chapter card(s) from “${m.title}”.`);
+    setAiNote(`Re-extracted ${detected.length} unit card(s) from “${m.title}” (replaced previous split for this book).`);
     setBusy(null);
     setProgress(null);
   }
@@ -580,7 +598,7 @@ export default function LibraryPage() {
               Or paste book / chapter text
               <textarea
                 className="textarea mt-1 min-h-28 font-mono text-xs"
-                placeholder={"Chapter 1 Our Earth\n...\n\nChapter 2 Our Society\n..."}
+                placeholder={"Paste TOC (Unit Topic Page), e.g.\n1 Scientific Learning 1\n2 Information and Communication Technology 18\n…\nor full chapter text"}
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
               />
