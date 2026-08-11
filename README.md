@@ -21,6 +21,12 @@ Use **Sign up** for more accounts. Data lives in browser `localStorage` (`teachd
 
 **Live:** https://teach-desk-app.vercel.app
 
+## PWA (installable app)
+
+Install from the browser (“Add to Home Screen” / Install app). After each production deploy, installed clients get an **Update now** prompt (service worker versioned by commit SHA). Data stays in `localStorage` offline for already-opened shell pages; API/PDF imports still need network.
+
+Local dev skips the service worker unless you set `localStorage.teachdesk-pwa-dev = "1"`.
+
 ## Modules (short)
 
 - **Library** — Class + subject books/chapters, bookmarks, PDF viewer, Understand/Create tools  
